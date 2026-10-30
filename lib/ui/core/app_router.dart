@@ -6,6 +6,7 @@ import '../features/auth/view_models/auth_view_model.dart';
 import '../features/auth/views/register_screen.dart';
 import '../features/auth/views/sign_in_screen.dart';
 import '../features/assistant/views/assistant_screen.dart';
+import '../features/chat_ai/views/chat_ai_screen.dart';
 import '../features/checkout/views/checkout_screen.dart';
 import '../features/catalog/views/catalog_screen.dart';
 import '../features/customer/views/customer_shell.dart';
@@ -100,6 +101,10 @@ GoRouter createAppRouter(AuthViewModel auth) => GoRouter(
         GoRoute(
           path: '/customer/assistant',
           builder: (context, state) => const AssistantScreen(),
+        ),
+        GoRoute(
+          path: '/customer/chat-ai',
+          builder: (context, state) => const ChatAiScreen(),
         ),
         GoRoute(
           path: '/customer/orders',

@@ -196,9 +196,14 @@ class RecommendedProduct {
 }
 
 class RecommendationResult {
-  const RecommendationResult({required this.advice, required this.products});
+  const RecommendationResult({
+    required this.advice,
+    required this.products,
+    this.sources = const [],
+  });
   final String advice;
   final List<RecommendedProduct> products;
+  final List<NutritionSource> sources;
 
   factory RecommendationResult.fromJson(Map<String, dynamic> json) =>
       RecommendationResult(
@@ -207,5 +212,21 @@ class RecommendationResult {
             .whereType<Map<String, dynamic>>()
             .map(RecommendedProduct.fromJson)
             .toList(growable: false),
+        sources: (json['sources'] as List<dynamic>? ?? const [])
+            .whereType<Map<String, dynamic>>()
+            .map(NutritionSource.fromJson)
+            .toList(growable: false),
+      );
+}
+
+class NutritionSource {
+  const NutritionSource({required this.title, required this.url});
+  final String title;
+  final String url;
+
+  factory NutritionSource.fromJson(Map<String, dynamic> json) =>
+      NutritionSource(
+        title: json['title'] as String,
+        url: json['url'] as String,
       );
 }

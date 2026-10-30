@@ -208,6 +208,33 @@ class _PetCard extends StatelessWidget {
                         fontSize: 12,
                       ),
                     ),
+                    if (pet.bodySize != null ||
+                        pet.activityLevel != null ||
+                        pet.bodyConditionScore != null)
+                      Text(
+                        [
+                          if (pet.bodySize != null)
+                            'Size ${switch (pet.bodySize) {
+                              'SMALL' => 'nhỏ',
+                              'MEDIUM' => 'vừa',
+                              'LARGE' => 'lớn',
+                              _ => pet.bodySize!,
+                            }}',
+                          if (pet.activityLevel != null)
+                            'Vận động ${switch (pet.activityLevel) {
+                              'LOW' => 'ít',
+                              'MODERATE' => 'vừa',
+                              'HIGH' => 'nhiều',
+                              _ => pet.activityLevel!,
+                            }}',
+                          if (pet.bodyConditionScore != null)
+                            'Thể trạng ${pet.bodyConditionScore}/9',
+                        ].join(' · '),
+                        style: const TextStyle(
+                          color: PawmartColors.muted,
+                          fontSize: 12,
+                        ),
+                      ),
                   ],
                 ),
               ),
@@ -223,6 +250,22 @@ class _PetCard extends StatelessWidget {
               ),
             ),
           ],
+          if (pet.feedingHabits?.isNotEmpty ?? false)
+            Align(
+              alignment: Alignment.centerLeft,
+              child: Text(
+                'Thói quen ăn: ${pet.feedingHabits}',
+                style: const TextStyle(color: PawmartColors.muted),
+              ),
+            ),
+          if (pet.foodPreferences?.isNotEmpty ?? false)
+            Align(
+              alignment: Alignment.centerLeft,
+              child: Text(
+                'Sở thích: ${pet.foodPreferences}',
+                style: const TextStyle(color: PawmartColors.muted),
+              ),
+            ),
           const Divider(height: 28),
           Row(
             children: [
@@ -272,7 +315,12 @@ class _PetFormSheetState extends State<_PetFormSheet> {
   late final TextEditingController _age;
   late final TextEditingController _weight;
   late final TextEditingController _notes;
+  late final TextEditingController _feedingHabits;
+  late final TextEditingController _foodPreferences;
   late String _type;
+  String? _bodySize;
+  String? _activityLevel;
+  int? _bodyConditionScore;
   XFile? _selectedPhoto;
   bool _saving = false;
   String? _error;
@@ -294,7 +342,12 @@ class _PetFormSheetState extends State<_PetFormSheet> {
     );
     _weight = TextEditingController(text: pet?.weightKg?.toString() ?? '');
     _notes = TextEditingController(text: pet?.specialNotes ?? '');
+    _feedingHabits = TextEditingController(text: pet?.feedingHabits ?? '');
+    _foodPreferences = TextEditingController(text: pet?.foodPreferences ?? '');
     _type = pet?.petType ?? 'DOG';
+    _bodySize = pet?.bodySize;
+    _activityLevel = pet?.activityLevel;
+    _bodyConditionScore = pet?.bodyConditionScore;
   }
 
   @override
@@ -304,6 +357,8 @@ class _PetFormSheetState extends State<_PetFormSheet> {
     _age.dispose();
     _weight.dispose();
     _notes.dispose();
+    _feedingHabits.dispose();
+    _foodPreferences.dispose();
     super.dispose();
   }
 
@@ -342,6 +397,15 @@ class _PetFormSheetState extends State<_PetFormSheet> {
           'specialNotes': _notes.text.trim().isEmpty
               ? null
               : _notes.text.trim(),
+          'bodySize': _bodySize,
+          'activityLevel': _activityLevel,
+          'bodyConditionScore': _bodyConditionScore,
+          'feedingHabits': _feedingHabits.text.trim().isEmpty
+              ? null
+              : _feedingHabits.text.trim(),
+          'foodPreferences': _foodPreferences.text.trim().isEmpty
+              ? null
+              : _foodPreferences.text.trim(),
         },
         photo: _selectedPhoto,
       );
@@ -517,12 +581,78 @@ class _PetFormSheetState extends State<_PetFormSheet> {
                 ],
               ),
               const SizedBox(height: 12),
+              DropdownButtonFormField<String>(
+                initialValue: _bodySize,
+                decoration: const InputDecoration(labelText: 'Kích cỡ của bé'),
+                items: const [
+                  DropdownMenuItem(value: 'SMALL', child: Text('Nhỏ')),
+                  DropdownMenuItem(value: 'MEDIUM', child: Text('Vừa')),
+                  DropdownMenuItem(value: 'LARGE', child: Text('Lớn')),
+                ],
+                onChanged: (value) => setState(() => _bodySize = value),
+              ),
+              const SizedBox(height: 12),
+              DropdownButtonFormField<String>(
+                initialValue: _activityLevel,
+                decoration: const InputDecoration(labelText: 'Mức vận động'),
+                items: const [
+                  DropdownMenuItem(value: 'LOW', child: Text('Ít')),
+                  DropdownMenuItem(value: 'MODERATE', child: Text('Vừa')),
+                  DropdownMenuItem(value: 'HIGH', child: Text('Nhiều')),
+                ],
+                onChanged: (value) => setState(() => _activityLevel = value),
+              ),
+              const SizedBox(height: 12),
+              DropdownButtonFormField<int>(
+                initialValue: _bodyConditionScore,
+                decoration: const InputDecoration(
+                  labelText: 'Điểm thể trạng (1–9, nếu đã biết)',
+                  helperText:
+                      'Nên hỏi bác sĩ thú y nếu chưa biết cách đánh giá.',
+                ),
+                items: [
+                  const DropdownMenuItem<int>(
+                    value: null,
+                    child: Text('Chưa rõ'),
+                  ),
+                  ...List.generate(
+                    9,
+                    (i) => DropdownMenuItem(
+                      value: i + 1,
+                      child: Text('${i + 1}/9'),
+                    ),
+                  ),
+                ],
+                onChanged: (value) =>
+                    setState(() => _bodyConditionScore = value),
+              ),
+              const SizedBox(height: 12),
+              TextFormField(
+                controller: _feedingHabits,
+                maxLength: 500,
+                maxLines: 2,
+                decoration: const InputDecoration(
+                  labelText: 'Thói quen ăn',
+                  hintText: 'Ví dụ: ăn chậm, thích nhiều bữa nhỏ',
+                ),
+              ),
+              const SizedBox(height: 12),
+              TextFormField(
+                controller: _foodPreferences,
+                maxLength: 500,
+                maxLines: 2,
+                decoration: const InputDecoration(
+                  labelText: 'Sở thích ăn uống',
+                  hintText: 'Ví dụ: thích cá, không thích hạt lớn',
+                ),
+              ),
+              const SizedBox(height: 12),
               TextFormField(
                 controller: _notes,
                 maxLines: 3,
                 textCapitalization: TextCapitalization.sentences,
                 decoration: const InputDecoration(
-                  labelText: 'Sức khỏe / sở thích ăn uống',
+                  labelText: 'Ghi chú sức khỏe và dị ứng',
                 ),
               ),
               if (_error != null) ...[

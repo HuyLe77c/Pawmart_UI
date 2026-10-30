@@ -2,12 +2,14 @@ import 'package:go_router/go_router.dart';
 
 import '../../data/repositories/auth_repository.dart';
 import '../../data/repositories/cart_repository.dart';
+import '../../data/repositories/chat_repository.dart';
 import '../../data/repositories/orders_repository.dart';
 import '../../data/repositories/pets_repository.dart';
 import '../../data/repositories/recommendation_repository.dart';
 import '../../data/services/api_client.dart';
 import '../../data/services/token_store.dart';
 import '../features/auth/view_models/auth_view_model.dart';
+import '../features/chat_ai/view_models/chat_ai_view_model.dart';
 import 'app_router.dart';
 
 class AppDependencies {
@@ -20,6 +22,7 @@ class AppDependencies {
     required this.ordersRepository,
     required this.cartRepository,
     required this.recommendationRepository,
+    required this.chatAiViewModel,
     required this.router,
   });
 
@@ -42,6 +45,10 @@ class AppDependencies {
       ordersRepository: ordersRepository,
       cartRepository: CartRepository(apiClient),
       recommendationRepository: RecommendationRepository(apiClient),
+      chatAiViewModel: ChatAiViewModel(
+        ChatRepository(apiClient),
+        authViewModel,
+      ),
       router: createAppRouter(authViewModel),
     );
   }
@@ -54,10 +61,12 @@ class AppDependencies {
   final OrdersRepository ordersRepository;
   final CartRepository cartRepository;
   final RecommendationRepository recommendationRepository;
+  final ChatAiViewModel chatAiViewModel;
   final GoRouter router;
 
   void dispose() {
     router.dispose();
+    chatAiViewModel.dispose();
     authViewModel.dispose();
     apiClient.close();
   }

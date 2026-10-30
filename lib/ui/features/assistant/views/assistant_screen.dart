@@ -1,27 +1,76 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
+import '../../../../data/repositories/chat_repository.dart';
 import '../../../core/app_dependencies.dart';
 import '../../../core/app_theme.dart';
 import '../../../core/formatters.dart';
+import '../../chat_ai/view_models/chat_ai_view_model.dart';
+import '../../chat_ai/views/chat_product_links.dart';
 import '../view_models/assistant_view_model.dart';
 
 class AssistantScreen extends StatelessWidget {
   const AssistantScreen({super.key});
 
   @override
-  Widget build(BuildContext context) => ChangeNotifierProvider(
-    create: (context) => AssistantViewModel(
-      context.read<AppDependencies>().petsRepository,
-      context.read<AppDependencies>().recommendationRepository,
-    )..loadPets(),
+  Widget build(BuildContext context) => MultiProvider(
+    providers: [
+      ChangeNotifierProvider(
+        create: (context) => AssistantViewModel(
+          context.read<AppDependencies>().petsRepository,
+          context.read<AppDependencies>().recommendationRepository,
+        )..loadPets(),
+      ),
+      ChangeNotifierProvider(
+        create: (context) => ChatAiViewModel(
+          ChatRepository(context.read<AppDependencies>().apiClient),
+          context.read<AppDependencies>().authViewModel,
+        ),
+      ),
+    ],
     child: const _AssistantBody(),
   );
 }
 
-class _AssistantBody extends StatelessWidget {
+class _AssistantBody extends StatefulWidget {
   const _AssistantBody();
+
+  @override
+  State<_AssistantBody> createState() => _AssistantBodyState();
+}
+
+class _AssistantBodyState extends State<_AssistantBody> {
+  final _question = TextEditingController();
+  final _scroll = ScrollController();
+
+  @override
+  void dispose() {
+    _question.dispose();
+    _scroll.dispose();
+    super.dispose();
+  }
+
+  void _scrollToEnd() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || !_scroll.hasClients) return;
+      _scroll.animateTo(
+        _scroll.position.maxScrollExtent,
+        duration: const Duration(milliseconds: 280),
+        curve: Curves.easeOut,
+      );
+    });
+  }
+
+  Future<void> _sendQuestion(ChatAiViewModel chat, String petName) async {
+    final question = _question.text.trim();
+    if (question.isEmpty || chat.isSending) return;
+    _question.clear();
+    FocusScope.of(context).unfocus();
+    await chat.send(question, petName: petName);
+    _scrollToEnd();
+  }
 
   @override
   Widget build(BuildContext context) => Scaffold(
@@ -46,10 +95,11 @@ class _AssistantBody extends StatelessWidget {
         ],
       ),
     ),
-    body: Consumer<AssistantViewModel>(
-      builder: (context, model, _) {
-        if (model.isLoadingPets)
+    body: Consumer2<AssistantViewModel, ChatAiViewModel>(
+      builder: (context, model, chat, _) {
+        if (model.isLoadingPets) {
           return const Center(child: CircularProgressIndicator());
+        }
         if (model.errorMessage != null && model.pets.isEmpty) {
           return _State(
             message: model.errorMessage!,
@@ -97,11 +147,21 @@ class _AssistantBody extends StatelessWidget {
             ),
             Expanded(
               child: ListView(
+                controller: _scroll,
                 padding: const EdgeInsets.fromLTRB(18, 24, 18, 16),
                 children: [
-                  const _Bubble(
-                    message: 'Chào bạn! Mình là trợ lý PawMart. Chọn hồ sơ của bé và gửi yêu cầu để nhận tư vấn dinh dưỡng từ thông tin đã lưu.',
-                    assistant: true,
+                  const _IntroCard(),
+                  const SizedBox(height: 18),
+                  Text(
+                    'Tư vấn cho ${pet.petName}',
+                    style: Theme.of(context).textTheme.titleMedium
+                        ?.copyWith(fontWeight: FontWeight.w800),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Nhận gợi ý dinh dưỡng theo hồ sơ, hoặc hỏi bất kỳ điều gì ở ô bên dưới.',
+                    style: Theme.of(context).textTheme.bodySmall
+                        ?.copyWith(color: PawmartColors.muted),
                   ),
                   if (model.isThinking) ...[
                     const SizedBox(height: 18),
@@ -123,12 +183,49 @@ class _AssistantBody extends StatelessWidget {
                   ],
                   if (model.result case final result?) ...[
                     const SizedBox(height: 18),
-                    _Bubble(
-                      message: 'Tư vấn cho ${pet.petName}',
-                      assistant: false,
-                    ),
-                    const SizedBox(height: 14),
-                    _Bubble(message: result.advice, assistant: true),
+                    _AdviceCard(advice: result.advice),
+                    if (result.sources.isNotEmpty) ...[
+                      const SizedBox(height: 10),
+                      Card(
+                        child: ExpansionTile(
+                          leading: const Icon(
+                            Icons.menu_book_outlined,
+                            color: PawmartColors.green,
+                          ),
+                          title: Text(
+                            'Nguồn tham khảo (${result.sources.length})',
+                          ),
+                          subtitle: const Text(
+                            'Chạm để xem và sao chép liên kết',
+                          ),
+                          children: [
+                            for (final source in result.sources)
+                              ListTile(
+                                dense: true,
+                                title: Text(source.title),
+                                trailing: const Icon(
+                                  Icons.copy_rounded,
+                                  size: 18,
+                                ),
+                                onTap: () async {
+                                  await Clipboard.setData(
+                                    ClipboardData(text: source.url),
+                                  );
+                                  if (context.mounted) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(
+                                        content: Text(
+                                          'Đã sao chép liên kết nguồn',
+                                        ),
+                                      ),
+                                    );
+                                  }
+                                },
+                              ),
+                          ],
+                        ),
+                      ),
+                    ],
                     if (result.products.isNotEmpty) ...[
                       const SizedBox(height: 22),
                       Text(
@@ -167,59 +264,143 @@ class _AssistantBody extends StatelessWidget {
                       ),
                     ],
                   ],
+                  if (chat.entries.isNotEmpty) ...[
+                    const SizedBox(height: 24),
+                    Text(
+                      'Câu hỏi của bạn',
+                      style: Theme.of(context).textTheme.titleMedium
+                          ?.copyWith(fontWeight: FontWeight.w800),
+                    ),
+                    const SizedBox(height: 12),
+                    for (final entry in chat.entries) ...[
+                      _Bubble(
+                        message: entry.content,
+                        assistant: entry.role == 'assistant',
+                      ),
+                      if (entry.products.isNotEmpty) ...[
+                        const SizedBox(height: 10),
+                        ChatProductLinks(products: entry.products),
+                      ],
+                      const SizedBox(height: 10),
+                    ],
+                  ],
+                  if (chat.isSending)
+                    const _Bubble(message: 'Đang trả lời…', assistant: true),
+                  if (chat.errorMessage != null)
+                    Card(
+                      child: ListTile(
+                        leading: const Icon(
+                          Icons.error_outline,
+                          color: PawmartColors.error,
+                        ),
+                        title: Text(chat.errorMessage!),
+                        trailing: chat.canRetry
+                            ? TextButton(
+                                onPressed: chat.retry,
+                                child: const Text('Thử lại'),
+                              )
+                            : null,
+                      ),
+                    ),
                 ],
               ),
             ),
             Container(
-              padding: const EdgeInsets.fromLTRB(18, 12, 18, 18),
+              padding: const EdgeInsets.fromLTRB(16, 10, 16, 12),
               decoration: const BoxDecoration(
                 color: Colors.white,
                 border: Border(top: BorderSide(color: Color(0xFFECE9E3))),
               ),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: DropdownButtonFormField<int>(
-                      initialValue: pet.petId,
-                      isExpanded: true,
-                      decoration: const InputDecoration(
-                        hintText: 'Chọn hồ sơ thú cưng',
-                        prefixIcon: Icon(Icons.pets_outlined, size: 20),
-                        contentPadding: EdgeInsets.symmetric(
-                          horizontal: 12,
-                          vertical: 12,
-                        ),
-                      ),
-                      items: model.pets
-                          .map(
-                            (p) => DropdownMenuItem(
-                              value: p.petId,
-                              child: Text(
-                                p.petName,
-                                overflow: TextOverflow.ellipsis,
+              child: SafeArea(
+                top: false,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Row(
+                      children: [
+                        Expanded(
+                          child: DropdownButtonFormField<int>(
+                            initialValue: pet.petId,
+                            isExpanded: true,
+                            decoration: const InputDecoration(
+                              hintText: 'Chọn hồ sơ thú cưng',
+                              prefixIcon: Icon(Icons.pets_outlined, size: 20),
+                              contentPadding: EdgeInsets.symmetric(
+                                horizontal: 12,
+                                vertical: 12,
                               ),
                             ),
-                          )
-                          .toList(),
-                      onChanged: model.isThinking ? null : model.selectPet,
+                            items: model.pets
+                                .map(
+                                  (p) => DropdownMenuItem(
+                                    value: p.petId,
+                                    child: Text(
+                                      p.petName,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
+                                )
+                                .toList(),
+                            onChanged: model.isThinking || chat.isSending
+                                ? null
+                                : (petId) {
+                                    model.selectPet(petId);
+                                    chat.clear();
+                                  },
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        OutlinedButton.icon(
+                          onPressed: model.isThinking ? null : model.ask,
+                          icon: const Icon(
+                            Icons.auto_awesome_rounded,
+                            size: 18,
+                          ),
+                          label: const Text('Gợi ý'),
+                        ),
+                      ],
                     ),
-                  ),
-                  const SizedBox(width: 10),
-                  IconButton.filled(
-                    tooltip: 'Nhận tư vấn',
-                    onPressed: model.isThinking ? null : model.ask,
-                    icon: model.isThinking
-                        ? const SizedBox(
-                            width: 20,
-                            height: 20,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              color: Colors.white,
+                    const SizedBox(height: 10),
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        Expanded(
+                          child: TextField(
+                            controller: _question,
+                            minLines: 1,
+                            maxLines: 3,
+                            maxLength: 2000,
+                            textCapitalization: TextCapitalization.sentences,
+                            decoration: const InputDecoration(
+                              hintText: 'Nhập câu hỏi của bạn…',
+                              prefixIcon: Icon(
+                                Icons.chat_bubble_outline_rounded,
+                              ),
+                              counterText: '',
                             ),
-                          )
-                        : const Icon(Icons.send_rounded),
-                  ),
-                ],
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        IconButton.filled(
+                          tooltip: 'Gửi câu hỏi tùy ý',
+                          onPressed: chat.isSending
+                              ? null
+                              : () => _sendQuestion(chat, pet.petName),
+                          icon: chat.isSending
+                              ? const SizedBox(
+                                  width: 18,
+                                  height: 18,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    color: Colors.white,
+                                  ),
+                                )
+                              : const Icon(Icons.send_rounded),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
               ),
             ),
           ],
@@ -269,6 +450,78 @@ class _Bubble extends StatelessWidget {
             ),
           ),
         ),
+      ],
+    ),
+  );
+}
+
+class _IntroCard extends StatelessWidget {
+  const _IntroCard();
+
+  @override
+  Widget build(BuildContext context) => Container(
+    width: double.infinity,
+    padding: const EdgeInsets.all(18),
+    decoration: BoxDecoration(
+      color: PawmartColors.greenPale,
+      borderRadius: BorderRadius.circular(20),
+    ),
+    child: const Row(
+      children: [
+        CircleAvatar(
+          backgroundColor: PawmartColors.green,
+          child: Icon(Icons.auto_awesome_rounded, color: Colors.white),
+        ),
+        SizedBox(width: 14),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Trợ lý PawMart',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800),
+              ),
+              SizedBox(height: 4),
+              Text(
+                'Hỏi tự do hoặc nhận gợi ý theo hồ sơ thú cưng.',
+                style: TextStyle(height: 1.35),
+              ),
+            ],
+          ),
+        ),
+      ],
+    ),
+  );
+}
+
+class _AdviceCard extends StatelessWidget {
+  const _AdviceCard({required this.advice});
+  final String advice;
+
+  @override
+  Widget build(BuildContext context) => Container(
+    width: double.infinity,
+    padding: const EdgeInsets.all(18),
+    decoration: BoxDecoration(
+      color: Colors.white,
+      border: Border.all(color: PawmartColors.line),
+      borderRadius: BorderRadius.circular(20),
+    ),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Row(
+          children: [
+            Icon(Icons.pets_rounded, color: PawmartColors.green, size: 19),
+            SizedBox(width: 8),
+            Text(
+              'Gợi ý dinh dưỡng',
+              style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        Text(advice, style: const TextStyle(height: 1.5, fontSize: 14)),
       ],
     ),
   );

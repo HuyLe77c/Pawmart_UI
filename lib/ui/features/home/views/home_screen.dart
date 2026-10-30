@@ -94,6 +94,7 @@ class _HomeContentState extends State<_HomeContent> {
                     slivers: [
                       SliverToBoxAdapter(child: _HomeHeader()),
                       SliverToBoxAdapter(child: _SearchShortcut()),
+                      SliverToBoxAdapter(child: _ChatAiShortcut()),
                       if (model.featured.isNotEmpty)
                         SliverToBoxAdapter(
                           child: Padding(
@@ -245,6 +246,52 @@ class _SearchShortcut extends StatelessWidget {
                 color: PawmartColors.ink,
                 size: 20,
               ),
+            ],
+          ),
+        ),
+      ),
+    ),
+  );
+}
+
+class _ChatAiShortcut extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
+    child: Card(
+      color: PawmartColors.greenPale,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(14),
+        onTap: () => context.go('/customer/chat-ai'),
+        child: const Padding(
+          padding: EdgeInsets.all(16),
+          child: Row(
+            children: [
+              CircleAvatar(
+                backgroundColor: PawmartColors.green,
+                child: Icon(Icons.smart_toy_outlined, color: Colors.white),
+              ),
+              SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Chat AI',
+                      style: TextStyle(
+                        fontWeight: FontWeight.w800,
+                        fontSize: 16,
+                      ),
+                    ),
+                    SizedBox(height: 3),
+                    Text(
+                      'Hỏi về sản phẩm, đơn hàng hoặc chăm sóc thú cưng',
+                      style: TextStyle(fontSize: 12),
+                    ),
+                  ],
+                ),
+              ),
+              Icon(Icons.arrow_forward_rounded, color: PawmartColors.green),
             ],
           ),
         ),

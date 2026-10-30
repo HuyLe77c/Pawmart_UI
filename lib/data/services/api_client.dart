@@ -58,8 +58,11 @@ class ApiClient {
   Future<dynamic> getJson(String path, {Map<String, String>? query}) =>
       _send('GET', path, query: query);
 
-  Future<dynamic> postJson(String path, [Object? body]) =>
-      _send('POST', path, body: body);
+  Future<dynamic> postJson(
+    String path, [
+    Object? body,
+    Duration? requestTimeout,
+  ]) => _send('POST', path, body: body, requestTimeout: requestTimeout);
 
   Future<dynamic> putJson(String path, [Object? body]) =>
       _send('PUT', path, body: body);
@@ -131,6 +134,7 @@ class ApiClient {
     String path, {
     Object? body,
     Map<String, String>? query,
+    Duration? requestTimeout,
   }) async {
     final headers = <String, String>{'Accept': 'application/json'};
     final token = await _tokenStore.read();
@@ -145,9 +149,11 @@ class ApiClient {
     if (body != null) request.body = jsonEncode(body);
 
     try {
-      final streamed = await _httpClient.send(request).timeout(timeout);
+      final streamed = await _httpClient
+          .send(request)
+          .timeout(requestTimeout ?? timeout);
       final response = await http.Response.fromStream(streamed)
-          .timeout(timeout);
+          .timeout(requestTimeout ?? timeout);
       return await _handleResponse(response);
     } on ApiException {
       rethrow;
