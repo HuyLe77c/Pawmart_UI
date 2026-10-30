@@ -33,6 +33,9 @@ class Product {
     this.description,
     this.ingredients,
     this.nutritionInfo,
+    this.packageSize,
+    this.lifeStage,
+    this.feedingGuide,
   });
 
   final int productId;
@@ -50,6 +53,9 @@ class Product {
   final String? description;
   final String? ingredients;
   final String? nutritionInfo;
+  final String? packageSize;
+  final String? lifeStage;
+  final String? feedingGuide;
 
   String? get primaryImageUrl {
     if (images.isEmpty) return null;
@@ -77,5 +83,8 @@ class Product {
     description: json['description'] as String?,
     ingredients: json['ingredients'] as String?,
     nutritionInfo: json['nutritionInfo'] as String?,
+    packageSize: json['packageSize'] as String?,
+    lifeStage: json['lifeStage'] as String?,
+    feedingGuide: json['feedingGuide'] as String?,
   );
 }

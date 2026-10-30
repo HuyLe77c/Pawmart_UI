@@ -19,7 +19,7 @@ class ChatProductLinks extends StatelessWidget {
         const Padding(
           padding: EdgeInsets.fromLTRB(4, 4, 4, 8),
           child: Text(
-            'Sản phẩm được nhắc đến',
+            'Xem sản phẩm tại cửa hàng',
             style: TextStyle(fontWeight: FontWeight.w800, fontSize: 14),
           ),
         ),
@@ -32,7 +32,10 @@ class ChatProductLinks extends StatelessWidget {
               ),
               leading: const CircleAvatar(
                 backgroundColor: PawmartColors.greenPale,
-                child: Icon(Icons.pets_rounded, color: PawmartColors.green),
+                child: Icon(
+                  Icons.shopping_bag_outlined,
+                  color: PawmartColors.green,
+                ),
               ),
               title: Text(
                 product.productName,

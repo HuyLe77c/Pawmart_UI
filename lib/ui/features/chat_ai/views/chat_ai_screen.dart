@@ -62,7 +62,19 @@ class _ChatBodyState extends State<_ChatBody> {
           onPressed: () => context.go('/customer/home'),
           icon: const Icon(Icons.arrow_back_rounded),
         ),
-        title: const Text('Chat AI'),
+        title: const Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Hỏi PawMart',
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
+            ),
+            Text(
+              'Trợ lý mua sắm và chăm sóc thú cưng',
+              style: TextStyle(fontSize: 11, color: PawmartColors.muted),
+            ),
+          ],
+        ),
         actions: [
           IconButton(
             tooltip: 'Xóa hội thoại',
@@ -82,7 +94,7 @@ class _ChatBodyState extends State<_ChatBody> {
               children: [
                 const _ChatBubble(
                   role: 'assistant',
-                  text: 'Chào bạn! Mình có thể giải đáp câu hỏi chung và hỗ trợ tìm hiểu sản phẩm, đơn hàng hoặc thú cưng của bạn từ dữ liệu PawMart. Bạn muốn hỏi gì?',
+                  text: 'Chào bạn! Mình có thể giúp tìm sản phẩm, xem đơn hàng và giải đáp câu hỏi về thú cưng. Bạn cần gì hôm nay?',
                 ),
                 const Padding(
                   padding: EdgeInsets.symmetric(vertical: 12),
@@ -189,9 +201,14 @@ class _ChatBubble extends StatelessWidget {
         constraints: const BoxConstraints(maxWidth: 330),
         padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(
-          color: assistant ? Colors.white : PawmartColors.green,
+          color: assistant ? Colors.white : PawmartColors.greenDark,
           border: assistant ? Border.all(color: PawmartColors.line) : null,
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.only(
+            topLeft: const Radius.circular(18),
+            topRight: const Radius.circular(18),
+            bottomLeft: Radius.circular(assistant ? 5 : 18),
+            bottomRight: Radius.circular(assistant ? 18 : 5),
+          ),
         ),
         child: Text(
           text,

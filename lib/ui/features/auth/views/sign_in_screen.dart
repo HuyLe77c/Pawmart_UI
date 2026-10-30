@@ -2,9 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
-import '../../../../domain/models/app_user.dart';
 import '../view_models/auth_view_model.dart';
 import '../../../core/app_theme.dart';
+import '../../../core/widgets/brand_lockup.dart';
 
 class SignInScreen extends StatefulWidget {
   const SignInScreen({super.key});
@@ -47,9 +47,9 @@ class _SignInScreenState extends State<SignInScreen> {
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     const _BrandMark(),
-                    const SizedBox(height: 30),
+                    const SizedBox(height: 38),
                     Text(
-                      'Chào mừng trở lại!',
+                      'Chào mừng trở lại.',
                       style: Theme.of(context).textTheme.headlineMedium
                           ?.copyWith(
                             fontWeight: FontWeight.w800,
@@ -58,7 +58,7 @@ class _SignInScreenState extends State<SignInScreen> {
                     ),
                     const SizedBox(height: 8),
                     const Text(
-                      'Đăng nhập để chăm sóc bé cưng tốt hơn mỗi ngày.',
+                      'Đăng nhập để mua sắm và theo dõi hành trình của bé.',
                     ),
                     const SizedBox(height: 26),
                     TextFormField(
@@ -135,11 +135,6 @@ class _SignInScreenState extends State<SignInScreen> {
                       icon: const Icon(Icons.storefront_outlined),
                       label: const Text('Tiếp tục xem sản phẩm'),
                     ),
-                    if (auth.user case final AppUser user?)
-                      Text(
-                        'Đang đăng nhập: ${user.fullName}',
-                        textAlign: TextAlign.center,
-                      ),
                   ],
                 ),
               ),
@@ -155,17 +150,7 @@ class _BrandMark extends StatelessWidget {
   const _BrandMark();
 
   @override
-  Widget build(BuildContext context) => Center(
-    child: Container(
-      width: 82,
-      height: 82,
-      decoration: const BoxDecoration(
-        color: PawmartColors.greenPale,
-        shape: BoxShape.circle,
-      ),
-      child: const Icon(Icons.pets, size: 42, color: PawmartColors.green),
-    ),
-  );
+  Widget build(BuildContext context) => const BrandLockup();
 }
 
 class _ErrorMessage extends StatelessWidget {

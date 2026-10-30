@@ -353,7 +353,7 @@ class _AssistantBodyState extends State<_AssistantBody> {
                         OutlinedButton.icon(
                           onPressed: model.isThinking ? null : model.ask,
                           icon: const Icon(
-                            Icons.auto_awesome_rounded,
+                            Icons.restaurant_menu_rounded,
                             size: 18,
                           ),
                           label: const Text('Gợi ý'),
@@ -470,7 +470,7 @@ class _IntroCard extends StatelessWidget {
       children: [
         CircleAvatar(
           backgroundColor: PawmartColors.green,
-          child: Icon(Icons.auto_awesome_rounded, color: Colors.white),
+          child: Icon(Icons.restaurant_menu_rounded, color: Colors.white),
         ),
         SizedBox(width: 14),
         Expanded(

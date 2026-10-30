@@ -10,9 +10,9 @@ import '../../../../domain/models/product.dart';
 import '../../auth/view_models/auth_view_model.dart';
 import '../../../core/cart_actions.dart';
 import '../../../core/app_theme.dart';
+import '../../../core/category_label.dart';
 import '../../../core/widgets/feedback_states.dart';
-import '../../../core/widgets/product_artwork.dart';
-import '../../../core/formatters.dart';
+import '../../../core/widgets/product_card.dart';
 import '../view_models/catalog_view_model.dart';
 
 class CatalogScreen extends StatelessWidget {
@@ -135,18 +135,29 @@ class _CatalogContentState extends State<_CatalogContent> {
       appBar: AppBar(
         toolbarHeight: 72,
         titleSpacing: 0,
-        leading: IconButton.filledTonal(
-          tooltip: 'Quay lại',
-          style: IconButton.styleFrom(backgroundColor: Colors.white),
-          onPressed: () {
-            if (context.canPop()) {
-              context.pop();
-            } else if (context.read<AuthViewModel>().isSignedIn) {
-              context.go('/customer/home');
-            }
-          },
-          icon: const Icon(Icons.arrow_back_rounded, size: 20),
-        ),
+        leading: !context.canPop() && !context.read<AuthViewModel>().isSignedIn
+            ? Padding(
+                padding: const EdgeInsets.all(8),
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    color: PawmartColors.greenDark,
+                    borderRadius: BorderRadius.circular(13),
+                  ),
+                  child: const Icon(Icons.pets_rounded, color: Colors.white),
+                ),
+              )
+            : IconButton.filledTonal(
+                tooltip: 'Quay lại',
+                style: IconButton.styleFrom(backgroundColor: Colors.white),
+                onPressed: () {
+                  if (context.canPop()) {
+                    context.pop();
+                  } else {
+                    context.go('/customer/home');
+                  }
+                },
+                icon: const Icon(Icons.arrow_back_rounded, size: 20),
+              ),
         title: TextField(
           controller: _searchController,
           textInputAction: TextInputAction.search,
@@ -156,7 +167,7 @@ class _CatalogContentState extends State<_CatalogContent> {
             model.setSearch(value.trim());
           },
           decoration: InputDecoration(
-            hintText: 'Tìm tên, thương hiệu…',
+            hintText: 'Tìm trong PawMart…',
             prefixIcon: const Icon(
               Icons.search_rounded,
               color: PawmartColors.green,
@@ -211,7 +222,7 @@ class _CatalogContentState extends State<_CatalogContent> {
                       const SizedBox(width: 8),
                       _PetChoice(
                         'Chó',
-                        Icons.cruelty_free_rounded,
+                        Icons.pets_outlined,
                         model.petType == 'DOG',
                         () => model.setPetType('DOG'),
                       ),
@@ -227,23 +238,29 @@ class _CatalogContentState extends State<_CatalogContent> {
                   const SizedBox(height: 12),
                   const _CatalogSectionLabel('DANH MỤC'),
                   const SizedBox(height: 8),
-                  Wrap(
-                    spacing: 7,
-                    runSpacing: 7,
-                    children: [
-                      _FilterChip(
-                        label: 'Tất cả danh mục',
-                        selected: model.categoryId == null,
-                        onSelected: () => model.setCategory(null),
-                      ),
-                      for (final category in model.categories)
-                        _FilterChip(
-                          label: category.categoryName,
+                  SizedBox(
+                    height: 44,
+                    child: ListView.separated(
+                      scrollDirection: Axis.horizontal,
+                      itemCount: model.categories.length + 1,
+                      separatorBuilder: (_, _) => const SizedBox(width: 8),
+                      itemBuilder: (context, index) {
+                        if (index == 0) {
+                          return _FilterChip(
+                            label: 'Tất cả danh mục',
+                            selected: model.categoryId == null,
+                            onSelected: () => model.setCategory(null),
+                          );
+                        }
+                        final category = model.categories[index - 1];
+                        return _FilterChip(
+                          label: displayCategoryName(category.categoryName),
                           selected: model.categoryId == category.categoryId,
                           onSelected: () =>
                               model.setCategory(category.categoryId),
-                        ),
-                    ],
+                        );
+                      },
+                    ),
                   ),
                 ],
               ),
@@ -257,11 +274,15 @@ class _CatalogContentState extends State<_CatalogContent> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        model.categories
-                                .where((c) => c.categoryId == model.categoryId)
-                                .firstOrNull
-                                ?.categoryName ??
-                            'Tất cả sản phẩm',
+                        displayCategoryName(
+                          model.categories
+                                  .where(
+                                    (c) => c.categoryId == model.categoryId,
+                                  )
+                                  .firstOrNull
+                                  ?.categoryName ??
+                              'Tất cả sản phẩm',
+                        ),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: const TextStyle(
@@ -339,13 +360,13 @@ class _CatalogContentState extends State<_CatalogContent> {
                               gridDelegate:
                                   const SliverGridDelegateWithFixedCrossAxisCount(
                                     crossAxisCount: 2,
-                                    mainAxisExtent: 278,
+                                    mainAxisExtent: 258,
                                     crossAxisSpacing: 10,
                                     mainAxisSpacing: 10,
                                   ),
                               itemBuilder: (context, index) {
                                 final product = model.products[index];
-                                return _CatalogProductCard(
+                                return ProductCard(
                                   product: product,
                                   categoryName: model.categories
                                       .where(
@@ -402,7 +423,7 @@ class _CatalogLoadingGrid extends StatelessWidget {
     padding: const EdgeInsets.fromLTRB(20, 4, 20, 16),
     gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
       crossAxisCount: 2,
-      mainAxisExtent: 278,
+      mainAxisExtent: 258,
       crossAxisSpacing: 10,
       mainAxisSpacing: 10,
     ),
@@ -534,11 +555,11 @@ class _FilterChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Material(
-    color: selected ? const Color(0xFFFFE5BD) : Colors.white,
+    color: selected ? PawmartColors.greenPale : Colors.white,
     shape: RoundedRectangleBorder(
       borderRadius: BorderRadius.circular(11),
       side: BorderSide(
-        color: selected ? const Color(0xFFE6BF85) : PawmartColors.line,
+        color: selected ? PawmartColors.greenPale : PawmartColors.line,
       ),
     ),
     clipBehavior: Clip.antiAlias,
@@ -546,202 +567,20 @@ class _FilterChip extends StatelessWidget {
       onTap: onSelected,
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
-        child: Text(
-          label,
-          style: TextStyle(
-            fontSize: 12,
-            fontWeight: selected ? FontWeight.w800 : FontWeight.w600,
-            color: selected ? const Color(0xFF754909) : PawmartColors.ink,
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 200),
+          child: Text(
+            label,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: selected ? FontWeight.w800 : FontWeight.w600,
+              color: selected ? PawmartColors.greenDark : PawmartColors.ink,
+            ),
           ),
         ),
       ),
     ),
   );
-}
-
-class _CatalogProductCard extends StatefulWidget {
-  const _CatalogProductCard({
-    required this.product,
-    required this.categoryName,
-    required this.adding,
-    required this.onTap,
-    required this.onAdd,
-  });
-  final Product product;
-  final String? categoryName;
-  final bool adding;
-  final VoidCallback onTap;
-  final VoidCallback onAdd;
-  @override
-  State<_CatalogProductCard> createState() => _CatalogProductCardState();
-}
-
-class _CatalogProductCardState extends State<_CatalogProductCard> {
-  bool pressed = false;
-  @override
-  Widget build(BuildContext context) {
-    final product = widget.product;
-    final brand = product.brand?.trim();
-    final eyebrow = brand != null && brand.isNotEmpty
-        ? '${widget.categoryName ?? 'Sản phẩm'} · $brand'
-        : widget.categoryName ?? 'Sản phẩm';
-    final reduceMotion = MediaQuery.disableAnimationsOf(context);
-    return AnimatedScale(
-      scale: pressed && !reduceMotion ? 0.975 : 1,
-      duration: reduceMotion
-          ? Duration.zero
-          : const Duration(milliseconds: 110),
-      child: Material(
-        color: Colors.white,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(14),
-          side: const BorderSide(color: PawmartColors.line),
-        ),
-        clipBehavior: Clip.antiAlias,
-        child: InkWell(
-          onTap: widget.onTap,
-          onHighlightChanged: (value) => setState(() => pressed = value),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Stack(
-                children: [
-                  ColoredBox(
-                    color: const Color(0xFFF2F4EF),
-                    child: ProductArtwork(
-                      imageUrl: product.primaryImageUrl,
-                      height: 156,
-                    ),
-                  ),
-                  if (product.stockQuantity <= 0)
-                    Positioned(
-                      left: 8,
-                      top: 8,
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 8,
-                          vertical: 5,
-                        ),
-                        decoration: BoxDecoration(
-                          color: PawmartColors.error,
-                          borderRadius: BorderRadius.circular(7),
-                        ),
-                        child: const Text(
-                          'Hết hàng',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 10,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                      ),
-                    ),
-                  if (product.isFeatured && product.stockQuantity > 0)
-                    Positioned(
-                      left: 8,
-                      top: 8,
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 8,
-                          vertical: 5,
-                        ),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFFFE5BD),
-                          borderRadius: BorderRadius.circular(6),
-                        ),
-                        child: const Text(
-                          'Nổi bật',
-                          style: TextStyle(
-                            fontSize: 10,
-                            fontWeight: FontWeight.w700,
-                            color: Color(0xFF754909),
-                          ),
-                        ),
-                      ),
-                    ),
-                  Positioned(
-                    right: 8,
-                    bottom: 8,
-                    child: Material(
-                      color: product.stockQuantity > 0
-                          ? Colors.white
-                          : const Color(0xFFE8E9E6),
-                      elevation: 1,
-                      borderRadius: BorderRadius.circular(12),
-                      child: InkWell(
-                        borderRadius: BorderRadius.circular(12),
-                        onTap: product.stockQuantity > 0 && !widget.adding
-                            ? widget.onAdd
-                            : null,
-                        child: SizedBox(
-                          width: 42,
-                          height: 42,
-                          child: Center(
-                            child: widget.adding
-                                ? const SizedBox.square(
-                                    dimension: 17,
-                                    child: CircularProgressIndicator(
-                                      strokeWidth: 2,
-                                    ),
-                                  )
-                                : Icon(
-                                    Icons.add_rounded,
-                                    color: product.stockQuantity > 0
-                                        ? PawmartColors.green
-                                        : PawmartColors.muted,
-                                  ),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              Expanded(
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(11, 9, 11, 11),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        eyebrow,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          fontSize: 11,
-                          color: PawmartColors.muted,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        product.productName,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w700,
-                          height: 1.2,
-                        ),
-                      ),
-                      const Spacer(),
-                      Text(
-                        formatVnd(product.price),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          fontSize: 15,
-                          fontWeight: FontWeight.w800,
-                          color: PawmartColors.greenDark,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
 }

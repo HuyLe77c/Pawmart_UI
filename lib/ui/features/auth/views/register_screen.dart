@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 
 import '../view_models/auth_view_model.dart';
 import '../../../core/app_theme.dart';
+import '../../../core/widgets/brand_lockup.dart';
 
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({super.key});
@@ -54,16 +55,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    Center(
-                      child: Icon(
-                        Icons.pets,
-                        size: 48,
-                        color: PawmartColors.green,
-                      ),
-                    ),
-                    const SizedBox(height: 16),
+                    const BrandLockup(),
+                    const SizedBox(height: 32),
                     Text(
-                      'Tạo tài khoản PawMart',
+                      'Tạo tài khoản.',
                       style: Theme.of(context).textTheme.headlineSmall
                           ?.copyWith(fontWeight: FontWeight.w800),
                     ),

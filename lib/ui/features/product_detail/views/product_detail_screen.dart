@@ -63,13 +63,21 @@ class _ProductDetailContentState extends State<_ProductDetailContent> {
       final product = model.product;
       return Scaffold(
         appBar: AppBar(
+          title: const Text('Sản phẩm'),
           leading: IconButton.filledTonal(
             tooltip: 'Quay lại',
             style: IconButton.styleFrom(backgroundColor: Colors.white),
-            onPressed: () => context.pop(),
+            onPressed: () =>
+                context.canPop() ? context.pop() : context.go('/catalog'),
             icon: const Icon(Icons.arrow_back_rounded),
           ),
           actions: [
+            if (context.read<AuthViewModel>().isSignedIn)
+              IconButton(
+                tooltip: 'Tư vấn về sản phẩm',
+                onPressed: () => context.go('/customer/assistant'),
+                icon: const Icon(Icons.forum_outlined),
+              ),
             IconButton(
               tooltip: 'Giỏ hàng',
               onPressed: () => context.go('/customer/cart'),
@@ -111,41 +119,55 @@ class _ProductDetailContentState extends State<_ProductDetailContent> {
                   border: Border(top: BorderSide(color: PawmartColors.line)),
                 ),
                 child: SafeArea(
-                  minimum: const EdgeInsets.fromLTRB(16, 8, 16, 10),
+                  minimum: const EdgeInsets.fromLTRB(20, 10, 20, 12),
                   child: Row(
                     children: [
-                      IconButton.filledTonal(
-                        tooltip: 'Tư vấn AI',
-                        onPressed: () => context.go('/customer/assistant'),
-                        icon: const Icon(Icons.chat_bubble_rounded),
-                      ),
-                      const SizedBox(width: 8),
-                      IconButton.filledTonal(
-                        tooltip: 'Giỏ hàng',
-                        onPressed: () => context.go('/customer/cart'),
-                        icon: const Icon(Icons.shopping_bag_outlined),
-                      ),
-                      const SizedBox(width: 8),
                       Expanded(
-                        child: FilledButton(
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              'Tạm tính',
+                              style: TextStyle(
+                                color: PawmartColors.muted,
+                                fontSize: 11,
+                              ),
+                            ),
+                            Text(
+                              formatVnd(product.price * _quantity),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                color: PawmartColors.greenDark,
+                                fontSize: 18,
+                                fontWeight: FontWeight.w900,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        flex: 2,
+                        child: FilledButton.icon(
                           onPressed: product.stockQuantity > 0 && !_adding
                               ? () => _add(product)
                               : null,
-                          child: _adding
+                          icon: _adding
                               ? const SizedBox.square(
-                                  dimension: 22,
+                                  dimension: 20,
                                   child: CircularProgressIndicator(
                                     strokeWidth: 2,
                                     color: Colors.white,
                                   ),
                                 )
-                              : Text(
-                                  product.stockQuantity > 0
-                                      ? 'Thêm vào giỏ · ${formatVnd(product.price * _quantity)}'
-                                      : 'Tạm hết hàng',
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
+                              : const Icon(Icons.add_shopping_cart_rounded),
+                          label: Text(
+                            product.stockQuantity > 0
+                                ? 'Thêm vào giỏ'
+                                : 'Tạm hết hàng',
+                          ),
                         ),
                       ),
                     ],
@@ -180,6 +202,9 @@ class _ProductBody extends StatelessWidget {
     final hasDescription = product.description?.trim().isNotEmpty == true;
     final hasIngredients = product.ingredients?.trim().isNotEmpty == true;
     final hasNutrition = product.nutritionInfo?.trim().isNotEmpty == true;
+    final hasPackageSize = product.packageSize?.trim().isNotEmpty == true;
+    final hasLifeStage = product.lifeStage?.trim().isNotEmpty == true;
+    final hasFeedingGuide = product.feedingGuide?.trim().isNotEmpty == true;
     return ListView(
       padding: const EdgeInsets.only(bottom: 28),
       children: [
@@ -192,27 +217,10 @@ class _ProductBody extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Row(
-                children: [
-                  if (product.brand?.trim().isNotEmpty == true)
-                    Flexible(
-                      child: _InfoChip(
-                        icon: Icons.verified_outlined,
-                        label: product.brand!,
-                      ),
-                    ),
-                  const Spacer(),
-                  if (product.sku?.trim().isNotEmpty == true)
-                    Text(
-                      'Mã: ${product.sku}',
-                      style: const TextStyle(
-                        color: PawmartColors.muted,
-                        fontSize: 12,
-                      ),
-                    ),
-                ],
-              ),
-              const SizedBox(height: 12),
+              if (product.brand?.trim().isNotEmpty == true) ...[
+                _InfoChip(icon: Icons.sell_outlined, label: product.brand!),
+                const SizedBox(height: 12),
+              ],
               Text(
                 product.productName,
                 style: theme.textTheme.headlineSmall?.copyWith(
@@ -221,6 +229,18 @@ class _ProductBody extends StatelessWidget {
                   color: PawmartColors.ink,
                 ),
               ),
+              if (product.sku?.trim().isNotEmpty == true) ...[
+                const SizedBox(height: 7),
+                Text(
+                  'Mã sản phẩm: ${product.sku}',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: PawmartColors.muted,
+                    fontSize: 12,
+                  ),
+                ),
+              ],
               const SizedBox(height: 18),
               Container(
                 width: double.infinity,
@@ -307,6 +327,25 @@ class _ProductBody extends StatelessWidget {
                   ),
                 ),
               ],
+              if (hasPackageSize || hasLifeStage) ...[
+                const SizedBox(height: 14),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    if (hasPackageSize)
+                      _InfoChip(
+                        icon: Icons.inventory_2_outlined,
+                        label: 'Quy cách: ${product.packageSize!.trim()}',
+                      ),
+                    if (hasLifeStage)
+                      _InfoChip(
+                        icon: Icons.pets_outlined,
+                        label: 'Độ tuổi: ${product.lifeStage!.trim()}',
+                      ),
+                  ],
+                ),
+              ],
               const SizedBox(height: 24),
               Row(
                 children: [
@@ -378,7 +417,19 @@ class _ProductBody extends StatelessWidget {
                           value: product.nutritionInfo!.trim(),
                         ),
                       ],
-                      if (!hasDescription && !hasIngredients && !hasNutrition)
+                      if (hasFeedingGuide) ...[
+                        if (hasDescription || hasIngredients || hasNutrition)
+                          const Divider(height: 28),
+                        _DetailBlock(
+                          icon: Icons.restaurant_outlined,
+                          title: 'Hướng dẫn sử dụng',
+                          value: product.feedingGuide!.trim(),
+                        ),
+                      ],
+                      if (!hasDescription &&
+                          !hasIngredients &&
+                          !hasNutrition &&
+                          !hasFeedingGuide)
                         const Text(
                           'Cửa hàng chưa cập nhật thông tin chi tiết.',
                           style: TextStyle(color: PawmartColors.muted),
@@ -482,14 +533,16 @@ class _InfoChip extends StatelessWidget {
       children: [
         Icon(icon, color: PawmartColors.green, size: 14),
         const SizedBox(width: 5),
-        Text(
-          label,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          style: const TextStyle(
-            color: PawmartColors.greenDark,
-            fontSize: 12,
-            fontWeight: FontWeight.w700,
+        Flexible(
+          child: Text(
+            label,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+              color: PawmartColors.greenDark,
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
+            ),
           ),
         ),
       ],

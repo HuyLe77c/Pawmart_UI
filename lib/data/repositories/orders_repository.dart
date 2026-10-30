@@ -33,6 +33,14 @@ class OrdersRepository {
     await _apiClient.getJson('api/orders/$orderId') as Map<String, dynamic>,
   );
 
+  Future<CheckoutQuote> checkoutQuote({String? promotionCode}) async =>
+      CheckoutQuote.fromJson(
+        await _apiClient.postJson('api/cart/checkout/quote', {
+          if (promotionCode?.isNotEmpty ?? false)
+            'promotionCode': promotionCode,
+        }) as Map<String, dynamic>,
+      );
+
   Future<OrderSummary> checkout({
     required String recipientName,
     required String recipientPhone,
@@ -41,6 +49,7 @@ class OrdersRepository {
     double? longitude,
     String paymentMethod = 'COD',
     String? promotionCode,
+    String? expectedQuoteFingerprint,
     String? note,
   }) async => OrderSummary.fromJson(
     await _apiClient.postJson('api/cart/checkout', {
@@ -51,6 +60,8 @@ class OrdersRepository {
       if (longitude != null) 'longitude': longitude,
       'paymentMethod': paymentMethod,
       if (promotionCode?.isNotEmpty ?? false) 'promotionCode': promotionCode,
+      if (expectedQuoteFingerprint != null)
+        'expectedQuoteFingerprint': expectedQuoteFingerprint,
       if (note?.isNotEmpty ?? false) 'note': note,
     }) as Map<String, dynamic>,
   );

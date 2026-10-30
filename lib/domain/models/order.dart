@@ -1,3 +1,36 @@
+class CheckoutQuote {
+  const CheckoutQuote({
+    required this.subtotal,
+    required this.discount,
+    required this.shippingFee,
+    required this.total,
+    required this.fingerprint,
+    required this.items,
+    this.promotionCode,
+  });
+
+  final double subtotal;
+  final double discount;
+  final double shippingFee;
+  final double total;
+  final String fingerprint;
+  final String? promotionCode;
+  final List<OrderLine> items;
+
+  factory CheckoutQuote.fromJson(Map<String, dynamic> json) => CheckoutQuote(
+    subtotal: (json['subtotal'] as num).toDouble(),
+    discount: (json['discount'] as num).toDouble(),
+    shippingFee: (json['shippingFee'] as num).toDouble(),
+    total: (json['total'] as num).toDouble(),
+    fingerprint: json['fingerprint'] as String,
+    promotionCode: json['promotionCode'] as String?,
+    items: (json['items'] as List<dynamic>? ?? const [])
+        .whereType<Map<String, dynamic>>()
+        .map(OrderLine.fromJson)
+        .toList(growable: false),
+  );
+}
+
 class OrderSummary {
   const OrderSummary({
     required this.orderId,

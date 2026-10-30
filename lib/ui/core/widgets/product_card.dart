@@ -11,12 +11,14 @@ class ProductCard extends StatelessWidget {
     required this.product,
     required this.onTap,
     required this.onAdd,
+    this.categoryName,
     this.adding = false,
   });
 
   final Product product;
   final VoidCallback onTap;
   final VoidCallback onAdd;
+  final String? categoryName;
   final bool adding;
 
   @override
@@ -27,90 +29,107 @@ class ProductCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Stack(
-            children: [
-              ColoredBox(
-                color: PawmartColors.cream,
-                child: ProductArtwork(
-                  imageUrl: product.primaryImageUrl,
-                  height: 138,
-                ),
-              ),
-              if (product.stockQuantity <= 0)
-                const Positioned(
-                  left: 8,
-                  top: 8,
-                  child: _ProductBadge(
-                    text: 'Hết hàng',
-                    color: PawmartColors.error,
+          SizedBox(
+            height: 128,
+            child: Stack(
+              fit: StackFit.expand,
+              children: [
+                ColoredBox(
+                  color: const Color(0xFFF2F5F0),
+                  child: ProductArtwork(
+                    imageUrl: product.primaryImageUrl,
+                    height: 128,
                   ),
                 ),
-            ],
+                if (product.stockQuantity <= 0)
+                  const Positioned(
+                    left: 10,
+                    top: 10,
+                    child: _ProductBadge(
+                      text: 'Hết hàng',
+                      color: PawmartColors.ink,
+                    ),
+                  )
+                else if (product.isFeatured)
+                  const Positioned(
+                    left: 10,
+                    top: 10,
+                    child: _ProductBadge(
+                      text: 'Nổi bật',
+                      color: PawmartColors.amber,
+                    ),
+                  ),
+                Positioned(
+                  right: 10,
+                  bottom: 10,
+                  child: IconButton.filled(
+                    tooltip: 'Thêm vào giỏ',
+                    style: IconButton.styleFrom(
+                      backgroundColor: PawmartColors.green,
+                      foregroundColor: Colors.white,
+                      minimumSize: const Size(44, 44),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                    ),
+                    onPressed: product.stockQuantity > 0 && !adding
+                        ? onAdd
+                        : null,
+                    icon: adding
+                        ? const SizedBox.square(
+                            dimension: 18,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: Colors.white,
+                            ),
+                          )
+                        : const Icon(Icons.add_shopping_cart_rounded, size: 20),
+                  ),
+                ),
+              ],
+            ),
           ),
           Expanded(
             child: Padding(
-              padding: const EdgeInsets.fromLTRB(11, 9, 9, 9),
+              padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    product.brand ?? _petLabel(product.targetPetType),
+                    product.brand ??
+                        categoryName ??
+                        _petLabel(product.targetPetType),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
                       fontSize: 11,
                       color: PawmartColors.muted,
+                      fontWeight: FontWeight.w600,
                     ),
                   ),
-                  const SizedBox(height: 3),
+                  const SizedBox(height: 5),
                   Text(
                     product.productName,
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
-                      fontSize: 13,
+                      fontSize: 14,
                       fontWeight: FontWeight.w700,
-                      height: 1.2,
+                      height: 1.22,
+                      color: PawmartColors.ink,
                     ),
                   ),
                   const Spacer(),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          formatVnd(product.price),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            fontSize: 13,
-                            color: PawmartColors.greenDark,
-                            fontWeight: FontWeight.w800,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 3),
-                      IconButton.outlined(
-                        tooltip: 'Thêm vào giỏ',
-                        style: IconButton.styleFrom(
-                          foregroundColor: PawmartColors.green,
-                          side: const BorderSide(color: PawmartColors.line),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                        ),
-                        onPressed: product.stockQuantity > 0 && !adding
-                            ? onAdd
-                            : null,
-                        icon: adding
-                            ? const SizedBox.square(
-                                dimension: 16,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                ),
-                              )
-                            : const Icon(Icons.add_rounded, size: 20),
-                      ),
-                    ],
+                  Text(
+                    formatVnd(product.price),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontSize: 16,
+                      color: PawmartColors.greenDark,
+                      fontWeight: FontWeight.w900,
+                      letterSpacing: -0.3,
+                    ),
                   ),
                 ],
               ),
@@ -137,13 +156,17 @@ class _ProductBadge extends StatelessWidget {
   Widget build(BuildContext context) => DecoratedBox(
     decoration: BoxDecoration(
       color: color,
-      borderRadius: BorderRadius.circular(8),
+      borderRadius: BorderRadius.circular(9),
     ),
     child: Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
       child: Text(
         text,
-        style: const TextStyle(color: Colors.white, fontSize: 10),
+        style: const TextStyle(
+          color: Colors.white,
+          fontSize: 11,
+          fontWeight: FontWeight.w800,
+        ),
       ),
     ),
   );

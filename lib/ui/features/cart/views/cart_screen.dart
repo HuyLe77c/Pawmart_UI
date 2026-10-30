@@ -100,14 +100,23 @@ class _CartContent extends StatelessWidget {
                               ),
                             ],
                           ),
+                          const SizedBox(height: 4),
+                          const Align(
+                            alignment: Alignment.centerLeft,
+                            child: Text(
+                              'Phí giao hàng và tổng tiền sẽ hiện ở bước tiếp theo.',
+                              style: TextStyle(
+                                color: PawmartColors.muted,
+                                fontSize: 12,
+                              ),
+                            ),
+                          ),
                           const SizedBox(height: 12),
                           FilledButton(
                             onPressed: model.isSaving
                                 ? null
                                 : () => context.go('/customer/checkout'),
-                            child: Text(
-                              'Tiếp tục đặt hàng · ${formatVnd(cart.subtotal)}',
-                            ),
+                            child: Text('Tiếp tục thanh toán'),
                           ),
                         ],
                       ),

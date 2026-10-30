@@ -68,7 +68,9 @@ class _OrderDetailContent extends StatelessWidget {
       return Scaffold(
         appBar: AppBar(
           title: Text(
-            order == null ? 'Chi tiết đơn hàng' : 'Theo dõi #${order.orderId}',
+            order == null
+                ? 'Chi tiết đơn hàng'
+                : 'Đơn #${order.orderId.length > 8 ? order.orderId.substring(0, 8).toUpperCase() : order.orderId}',
             style: const TextStyle(fontWeight: FontWeight.w800),
           ),
         ),

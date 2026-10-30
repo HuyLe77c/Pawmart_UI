@@ -14,14 +14,32 @@ class ErrorPanel extends StatelessWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const Icon(
-            Icons.wifi_off_rounded,
-            size: 40,
-            color: PawmartColors.muted,
+          Container(
+            width: 76,
+            height: 76,
+            decoration: const BoxDecoration(
+              color: PawmartColors.amberPale,
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(
+              Icons.wifi_off_rounded,
+              size: 34,
+              color: PawmartColors.amber,
+            ),
           ),
-          const SizedBox(height: 12),
-          Text(message, textAlign: TextAlign.center),
-          const SizedBox(height: 14),
+          const SizedBox(height: 18),
+          Text(
+            'Chưa tải được nội dung',
+            style: Theme.of(context).textTheme.titleMedium,
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 6),
+          Text(
+            message,
+            textAlign: TextAlign.center,
+            style: const TextStyle(color: PawmartColors.muted, height: 1.45),
+          ),
+          const SizedBox(height: 18),
           OutlinedButton.icon(
             onPressed: onRetry,
             icon: const Icon(Icons.refresh),
@@ -51,26 +69,34 @@ class EmptyState extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Center(
     child: Padding(
-      padding: const EdgeInsets.all(28),
+      padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 32),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 38, color: PawmartColors.green),
-          const SizedBox(height: 16),
+          Container(
+            width: 88,
+            height: 88,
+            decoration: const BoxDecoration(
+              color: PawmartColors.greenPale,
+              shape: BoxShape.circle,
+            ),
+            child: Icon(icon, size: 38, color: PawmartColors.green),
+          ),
+          const SizedBox(height: 20),
           Text(
             title,
-            style: Theme.of(context).textTheme.titleMedium
-                ?.copyWith(fontWeight: FontWeight.w700),
+            textAlign: TextAlign.center,
+            style: Theme.of(context).textTheme.titleLarge,
           ),
-          const SizedBox(height: 6),
+          const SizedBox(height: 8),
           Text(
             message,
             textAlign: TextAlign.center,
-            style: const TextStyle(color: PawmartColors.muted),
+            style: const TextStyle(color: PawmartColors.muted, height: 1.45),
           ),
           if (actionLabel != null && onAction != null) ...[
-            const SizedBox(height: 20),
-            OutlinedButton(onPressed: onAction, child: Text(actionLabel!)),
+            const SizedBox(height: 22),
+            FilledButton(onPressed: onAction, child: Text(actionLabel!)),
           ],
         ],
       ),

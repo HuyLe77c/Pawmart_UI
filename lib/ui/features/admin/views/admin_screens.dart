@@ -1150,7 +1150,13 @@ class _ProductFormState extends State<_ProductForm> {
       price = TextEditingController(),
       stock = TextEditingController(),
       image = TextEditingController(),
-      brand = TextEditingController();
+      brand = TextEditingController(),
+      description = TextEditingController(),
+      ingredients = TextEditingController(),
+      nutritionInfo = TextEditingController(),
+      packageSize = TextEditingController(),
+      lifeStage = TextEditingController(),
+      feedingGuide = TextEditingController();
   XFile? selectedImage;
   bool choosingImage = false;
   int? categoryId;
@@ -1163,6 +1169,12 @@ class _ProductFormState extends State<_ProductForm> {
     price.text = '${p?['price'] ?? ''}';
     stock.text = '${p?['stockQuantity'] ?? '0'}';
     brand.text = p?['brand'] as String? ?? '';
+    description.text = p?['description'] as String? ?? '';
+    ingredients.text = p?['ingredients'] as String? ?? '';
+    nutritionInfo.text = p?['nutritionInfo'] as String? ?? '';
+    packageSize.text = p?['packageSize'] as String? ?? '';
+    lifeStage.text = p?['lifeStage'] as String? ?? '';
+    feedingGuide.text = p?['feedingGuide'] as String? ?? '';
     categoryId =
         p?['categoryId'] as int? ??
         widget.categories.first['categoryId'] as int;
@@ -1179,6 +1191,12 @@ class _ProductFormState extends State<_ProductForm> {
     stock.dispose();
     image.dispose();
     brand.dispose();
+    description.dispose();
+    ingredients.dispose();
+    nutritionInfo.dispose();
+    packageSize.dispose();
+    lifeStage.dispose();
+    feedingGuide.dispose();
     super.dispose();
   }
 
@@ -1227,6 +1245,46 @@ class _ProductFormState extends State<_ProductForm> {
           TextField(
             controller: brand,
             decoration: const InputDecoration(labelText: 'Thương hiệu'),
+          ),
+          TextField(
+            controller: packageSize,
+            maxLength: 100,
+            decoration: const InputDecoration(
+              labelText: 'Quy cách / khối lượng trên bao bì',
+            ),
+          ),
+          TextField(
+            controller: lifeStage,
+            maxLength: 100,
+            decoration: const InputDecoration(
+              labelText: 'Giai đoạn sống phù hợp',
+            ),
+          ),
+          TextField(
+            controller: description,
+            maxLines: 3,
+            decoration: const InputDecoration(labelText: 'Mô tả sản phẩm'),
+          ),
+          TextField(
+            controller: ingredients,
+            maxLines: 3,
+            decoration: const InputDecoration(
+              labelText: 'Thành phần theo nhãn',
+            ),
+          ),
+          TextField(
+            controller: nutritionInfo,
+            maxLines: 3,
+            decoration: const InputDecoration(
+              labelText: 'Dinh dưỡng theo nhãn',
+            ),
+          ),
+          TextField(
+            controller: feedingGuide,
+            maxLines: 3,
+            decoration: const InputDecoration(
+              labelText: 'Hướng dẫn sử dụng theo nhãn',
+            ),
           ),
           DropdownButtonFormField<int>(
             initialValue: categoryId,
@@ -1344,11 +1402,34 @@ class _ProductFormState extends State<_ProductForm> {
             'lowStockThreshold': widget.product?['lowStockThreshold'] ?? 5,
             'targetPetType': target,
             'isFeatured': widget.product?['isFeatured'] ?? false,
-            'description': widget.product?['description'],
-            'ingredients': widget.product?['ingredients'],
-            'nutritionInfo': widget.product?['nutritionInfo'],
+            'description': description.text.trim().isEmpty
+                ? null
+                : description.text.trim(),
+            'ingredients': ingredients.text.trim().isEmpty
+                ? null
+                : ingredients.text.trim(),
+            'nutritionInfo': nutritionInfo.text.trim().isEmpty
+                ? null
+                : nutritionInfo.text.trim(),
+            'packageSize': packageSize.text.trim().isEmpty
+                ? null
+                : packageSize.text.trim(),
+            'lifeStage': lifeStage.text.trim().isEmpty
+                ? null
+                : lifeStage.text.trim(),
+            'feedingGuide': feedingGuide.text.trim().isEmpty
+                ? null
+                : feedingGuide.text.trim(),
             'sku': widget.product?['sku'],
-            'images': image.text.trim().isEmpty
+            'images':
+                widget.product != null &&
+                    image.text.trim() ==
+                        ((widget.product!['images'] as List<dynamic>?)
+                                    ?.firstOrNull?['imageUrl']
+                                as String? ??
+                            '')
+                ? widget.product!['images']
+                : image.text.trim().isEmpty
                 ? []
                 : [
                     {

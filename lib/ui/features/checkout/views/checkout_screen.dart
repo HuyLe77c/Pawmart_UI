@@ -4,6 +4,8 @@ import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
 import '../../../core/app_dependencies.dart';
+import '../../../core/app_theme.dart';
+import '../../../core/formatters.dart';
 import '../view_models/checkout_view_model.dart';
 
 class CheckoutScreen extends StatelessWidget {
@@ -12,7 +14,8 @@ class CheckoutScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) => ChangeNotifierProvider(
     create: (context) =>
-        CheckoutViewModel(context.read<AppDependencies>().ordersRepository),
+        CheckoutViewModel(context.read<AppDependencies>().ordersRepository)
+          ..loadQuote(),
     child: const _CheckoutBody(),
   );
 }
@@ -121,19 +124,20 @@ class _CheckoutBodyState extends State<_CheckoutBody> {
 
   @override
   Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(title: const Text('Địa chỉ giao hàng')),
+    appBar: AppBar(title: const Text('Xác nhận đơn hàng')),
     body: Consumer<CheckoutViewModel>(
       builder: (context, model, _) => Form(
         key: _formKey,
         child: ListView(
-          padding: const EdgeInsets.fromLTRB(20, 12, 20, 28),
+          padding: const EdgeInsets.fromLTRB(20, 20, 20, 32),
           children: [
-            Text(
-              'Thông tin người nhận',
-              style: Theme.of(context).textTheme.titleLarge
-                  ?.copyWith(fontWeight: FontWeight.w800),
+            const Text(
+              'Kiểm tra thông tin để hoàn tất đơn hàng.',
+              style: TextStyle(color: PawmartColors.muted),
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 22),
+            const _CheckoutSectionTitle('01', 'Giao hàng'),
+            const SizedBox(height: 14),
             TextFormField(
               controller: _name,
               decoration: const InputDecoration(labelText: 'Họ tên người nhận'),
@@ -164,28 +168,32 @@ class _CheckoutBodyState extends State<_CheckoutBody> {
                   ? 'Địa chỉ cần ít nhất 5 ký tự'
                   : null,
             ),
-            const SizedBox(height: 12),
-            OutlinedButton.icon(
-              onPressed: _locating ? null : _locate,
-              icon: _locating
-                  ? const SizedBox(
-                      width: 18,
-                      height: 18,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
-                  : const Icon(Icons.my_location),
-              label: const Text('Lấy tọa độ GPS'),
-            ),
-            if (_locationMessage != null)
-              Padding(
-                padding: const EdgeInsets.only(top: 8),
-                child: Text(_locationMessage!),
-              ),
+            const SizedBox(height: 8),
             ExpansionTile(
               tilePadding: EdgeInsets.zero,
-              title: const Text('Tọa độ giao hàng (tùy chọn)'),
+              title: const Text('Thêm vị trí giao hàng'),
+              subtitle: const Text('Tùy chọn nếu địa chỉ khó tìm'),
               leading: const Icon(Icons.location_on_outlined),
               children: [
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: OutlinedButton.icon(
+                    onPressed: _locating ? null : _locate,
+                    icon: _locating
+                        ? const SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Icon(Icons.my_location),
+                    label: const Text('Dùng vị trí hiện tại'),
+                  ),
+                ),
+                if (_locationMessage != null)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: Text(_locationMessage!),
+                  ),
                 Row(
                   children: [
                     Expanded(
@@ -213,12 +221,9 @@ class _CheckoutBodyState extends State<_CheckoutBody> {
                 ),
               ],
             ),
-            const SizedBox(height: 20),
-            Text(
-              'Thanh toán',
-              style: Theme.of(context).textTheme.titleLarge
-                  ?.copyWith(fontWeight: FontWeight.w800),
-            ),
+            const SizedBox(height: 24),
+            const _CheckoutSectionTitle('02', 'Thanh toán'),
+            const SizedBox(height: 12),
             Card(
               child: const ListTile(
                 leading: Icon(Icons.payments_outlined),
@@ -226,25 +231,91 @@ class _CheckoutBodyState extends State<_CheckoutBody> {
                 subtitle: Text('Đang khả dụng'),
               ),
             ),
-            const ListTile(
-              enabled: false,
-              leading: Icon(Icons.lock_outline),
-              title: Text('VNPAY / MoMo / ZaloPay'),
-              subtitle: Text('Chưa cấu hình cổng thanh toán'),
-            ),
-            const ListTile(
-              enabled: false,
-              leading: Icon(Icons.map_outlined),
-              title: Text('Bản đồ và phí theo khoảng cách'),
-              subtitle: Text(
-                'Chưa cấu hình nhà cung cấp bản đồ; phí giao hàng mặc định sẽ do API tính',
-              ),
-            ),
             const SizedBox(height: 12),
             TextFormField(
               controller: _promo,
+              enabled: !model.isSubmitting,
+              onChanged: (_) => model.invalidateQuote(),
               decoration: const InputDecoration(
                 labelText: 'Mã khuyến mãi (không bắt buộc)',
+              ),
+            ),
+            Align(
+              alignment: Alignment.centerRight,
+              child: TextButton.icon(
+                onPressed: model.isLoadingQuote || model.isSubmitting
+                    ? null
+                    : () => model.loadQuote(promotionCode: _promo.text.trim()),
+                icon: const Icon(Icons.refresh_rounded),
+                label: const Text('Cập nhật tổng tiền'),
+              ),
+            ),
+            const SizedBox(height: 12),
+            const _CheckoutSectionTitle('03', 'Đơn hàng của bạn'),
+            const SizedBox(height: 12),
+            Card(
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: model.isLoadingQuote
+                    ? const Center(child: CircularProgressIndicator())
+                    : model.quote == null
+                    ? Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            model.quoteError ??
+                                'Cập nhật tổng tiền để tiếp tục.',
+                          ),
+                          const SizedBox(height: 8),
+                          OutlinedButton(
+                            onPressed: () => model.loadQuote(
+                              promotionCode: _promo.text.trim(),
+                            ),
+                            child: const Text('Thử lại'),
+                          ),
+                        ],
+                      )
+                    : Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          for (final item in model.quote!.items) ...[
+                            Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Text(item.productName),
+                                      Text(
+                                        '${item.quantity} × ${formatVnd(item.unitPrice)}',
+                                        style: Theme.of(context)
+                                            .textTheme
+                                            .bodySmall,
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                Text(formatVnd(item.lineTotal)),
+                              ],
+                            ),
+                            const SizedBox(height: 8),
+                          ],
+                          const Divider(),
+                          _PriceRow('Tạm tính', model.quote!.subtotal),
+                          if (model.quote!.discount > 0)
+                            _PriceRow('Giảm giá', -model.quote!.discount),
+                          _PriceRow('Phí giao hàng', model.quote!.shippingFee),
+                          const Divider(),
+                          _PriceRow(
+                            'Tổng thanh toán',
+                            model.quote!.total,
+                            prominent: true,
+                          ),
+                        ],
+                      ),
               ),
             ),
             const SizedBox(height: 12),
@@ -260,14 +331,15 @@ class _CheckoutBodyState extends State<_CheckoutBody> {
                 model.errorMessage!,
                 style: TextStyle(color: Theme.of(context).colorScheme.error),
               ),
-              OutlinedButton(
-                onPressed: model.isSubmitting ? null : () => _submit(model),
-                child: const Text('Thử gửi lại'),
-              ),
             ],
             const SizedBox(height: 20),
             FilledButton.icon(
-              onPressed: model.isSubmitting ? null : () => _submit(model),
+              onPressed:
+                  model.isSubmitting ||
+                      model.isLoadingQuote ||
+                      model.quote == null
+                  ? null
+                  : () => _submit(model),
               icon: model.isSubmitting
                   ? const SizedBox(
                       width: 18,
@@ -276,12 +348,73 @@ class _CheckoutBodyState extends State<_CheckoutBody> {
                     )
                   : const Icon(Icons.check),
               label: Text(
-                model.isSubmitting ? 'Đang đặt hàng…' : 'Xác nhận đặt hàng',
+                model.isSubmitting
+                    ? 'Đang đặt hàng…'
+                    : 'Đặt hàng · ${model.quote == null ? '—' : formatVnd(model.quote!.total)}',
               ),
             ),
           ],
         ),
       ),
+    ),
+  );
+}
+
+class _CheckoutSectionTitle extends StatelessWidget {
+  const _CheckoutSectionTitle(this.number, this.title);
+
+  final String number;
+  final String title;
+
+  @override
+  Widget build(BuildContext context) => Row(
+    children: [
+      Container(
+        width: 34,
+        height: 34,
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: PawmartColors.greenPale,
+          borderRadius: BorderRadius.circular(11),
+        ),
+        child: Text(
+          number,
+          style: const TextStyle(
+            color: PawmartColors.greenDark,
+            fontSize: 12,
+            fontWeight: FontWeight.w900,
+          ),
+        ),
+      ),
+      const SizedBox(width: 10),
+      Text(title, style: Theme.of(context).textTheme.titleLarge),
+    ],
+  );
+}
+
+class _PriceRow extends StatelessWidget {
+  const _PriceRow(this.label, this.amount, {this.prominent = false});
+
+  final String label;
+  final double amount;
+  final bool prominent;
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.symmetric(vertical: 4),
+    child: Row(
+      children: [
+        Expanded(
+          child: Text(
+            label,
+            style: TextStyle(fontWeight: prominent ? FontWeight.w800 : null),
+          ),
+        ),
+        Text(
+          formatVnd(amount),
+          style: TextStyle(fontWeight: prominent ? FontWeight.w800 : null),
+        ),
+      ],
     ),
   );
 }

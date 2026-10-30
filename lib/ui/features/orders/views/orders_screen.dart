@@ -136,8 +136,12 @@ class _OrderCard extends StatelessWidget {
               children: [
                 Expanded(
                   child: Text(
-                    'Đơn #${order.orderId}',
-                    style: const TextStyle(fontWeight: FontWeight.w800),
+                    'Đơn #${order.orderId.length > 8 ? order.orderId.substring(0, 8).toUpperCase() : order.orderId}',
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w800,
+                      fontSize: 16,
+                      color: PawmartColors.ink,
+                    ),
                   ),
                 ),
                 _StatusChip(status: order.status),

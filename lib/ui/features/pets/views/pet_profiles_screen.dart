@@ -32,11 +32,14 @@ class _PetProfilesContent extends StatelessWidget {
     await showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
+      constraints: BoxConstraints(
+        maxHeight: MediaQuery.sizeOf(context).height * .96,
+      ),
       useSafeArea: true,
       backgroundColor: Colors.transparent,
       builder: (context) => ChangeNotifierProvider<PetsViewModel>.value(
         value: viewModel,
-        child: _PetFormSheet(pet: pet),
+        child: PetProfileEditorSheet(pet: pet),
       ),
     );
   }
@@ -74,9 +77,8 @@ class _PetProfilesContent extends StatelessWidget {
   Widget build(BuildContext context) => Consumer<PetsViewModel>(
     builder: (context, model, _) => Scaffold(
       appBar: AppBar(
-        centerTitle: true,
         title: const Text(
-          'Hồ sơ thú cưng',
+          'Hồ sơ của tôi',
           style: TextStyle(fontWeight: FontWeight.w800),
         ),
         actions: [
@@ -100,11 +102,19 @@ class _PetProfilesContent extends StatelessWidget {
           ? RefreshIndicator(
               onRefresh: model.load,
               child: ListView(
-                children: const [
-                  SizedBox(height: 90),
-                  EmptyState(
+                padding: const EdgeInsets.fromLTRB(20, 14, 20, 24),
+                children: [
+                  const _AccountHeader(),
+                  const SizedBox(height: 34),
+                  const EmptyState(
                     title: 'Thêm thành viên bốn chân',
                     message: 'Lưu tuổi, giống và cân nặng để nhận gợi ý thức ăn phù hợp.',
+                  ),
+                  const SizedBox(height: 16),
+                  FilledButton.icon(
+                    onPressed: () => _openForm(context),
+                    icon: const Icon(Icons.add_rounded),
+                    label: const Text('Tạo hồ sơ cho bé'),
                   ),
                 ],
               ),
@@ -113,11 +123,35 @@ class _PetProfilesContent extends StatelessWidget {
               onRefresh: model.load,
               child: ListView.separated(
                 padding: const EdgeInsets.fromLTRB(20, 10, 20, 28),
-                itemCount: model.pets.length,
+                itemCount: model.pets.length + 2,
                 separatorBuilder: (_, _) => const SizedBox(height: 12),
                 itemBuilder: (context, index) {
-                  final pet = model.pets[index];
-                  return _PetCard(
+                  if (index == 0) return const _AccountHeader();
+                  if (index == 1) {
+                    return Padding(
+                      padding: const EdgeInsets.fromLTRB(2, 12, 0, 2),
+                      child: Row(
+                        children: [
+                          const Expanded(
+                            child: Text(
+                              'Các bé của tôi',
+                              style: TextStyle(
+                                fontSize: 20,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                          ),
+                          TextButton.icon(
+                            onPressed: () => _openForm(context),
+                            icon: const Icon(Icons.add_rounded, size: 18),
+                            label: const Text('Thêm bé'),
+                          ),
+                        ],
+                      ),
+                    );
+                  }
+                  final pet = model.pets[index - 2];
+                  return PetProfileCard(
                     pet: pet,
                     onEdit: () => _openForm(context, pet: pet),
                     onDelete: () => _delete(context, pet),
@@ -131,188 +165,412 @@ class _PetProfilesContent extends StatelessWidget {
   );
 }
 
-class _PetCard extends StatelessWidget {
-  const _PetCard({
+class _AccountHeader extends StatelessWidget {
+  const _AccountHeader();
+
+  @override
+  Widget build(BuildContext context) {
+    final user = context.watch<AuthViewModel>().user;
+    final name = user?.fullName.trim() ?? '';
+    return Container(
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: PawmartColors.greenDark,
+        borderRadius: BorderRadius.circular(22),
+      ),
+      child: Row(
+        children: [
+          CircleAvatar(
+            radius: 28,
+            backgroundColor: Colors.white.withValues(alpha: .16),
+            child: Text(
+              name.isEmpty ? 'P' : name[0].toUpperCase(),
+              style: const TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.w900,
+                fontSize: 22,
+              ),
+            ),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  name.isEmpty ? 'Tài khoản PawMart' : name,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 18,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  user?.email ?? '',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: Color(0xFFC9E9D8),
+                    fontSize: 12,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class PetProfileCard extends StatelessWidget {
+  const PetProfileCard({
+    super.key,
     required this.pet,
     required this.onEdit,
     required this.onDelete,
     required this.onAssistant,
   });
+
   final PetProfile pet;
   final VoidCallback onEdit;
   final VoidCallback onDelete;
   final VoidCallback onAssistant;
 
   @override
-  Widget build(BuildContext context) => Card(
-    child: Padding(
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        children: [
-          Row(
-            children: [
-              CircleAvatar(
-                radius: 30,
-                backgroundColor: PawmartColors.greenPale,
-                child: pet.imageUrl == null
-                    ? Icon(
-                        pet.petType == 'CAT' ? Icons.pets : Icons.pets_outlined,
-                        color: PawmartColors.green,
-                      )
-                    : ClipOval(
-                        child: Image.network(
-                          context
-                              .read<ApiClient>()
-                              .resolveMediaUri(pet.imageUrl!)
-                              .toString(),
-                          width: 60,
-                          height: 60,
-                          fit: BoxFit.cover,
-                          errorBuilder: (_, _, _) => Icon(
-                            pet.petType == 'CAT'
-                                ? Icons.pets
-                                : Icons.pets_outlined,
+  Widget build(BuildContext context) {
+    final species = switch (pet.petType) {
+      'CAT' => 'Mèo',
+      'DOG' => 'Chó',
+      _ => 'Thú cưng',
+    };
+    final weight = pet.weightKg == null ? 'Chưa rõ' : '${pet.weightKg} kg';
+    final imageUrl = pet.imageUrl?.trim().isNotEmpty != true
+        ? null
+        : context.read<ApiClient>().resolveMediaUri(pet.imageUrl!).toString();
+
+    return Card(
+      clipBehavior: Clip.antiAlias,
+      child: Padding(
+        padding: const EdgeInsets.all(18),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: PawmartColors.greenPale,
+                borderRadius: BorderRadius.circular(18),
+              ),
+              child: Row(
+                children: [
+                  Container(
+                    width: 86,
+                    height: 86,
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(17),
+                    ),
+                    clipBehavior: Clip.antiAlias,
+                    child: imageUrl == null
+                        ? const Icon(
+                            Icons.pets_rounded,
+                            size: 34,
+                            color: PawmartColors.green,
+                          )
+                        : Image.network(
+                            imageUrl,
+                            fit: BoxFit.cover,
+                            errorBuilder: (_, _, _) => const Icon(
+                              Icons.pets_rounded,
+                              size: 34,
+                              color: PawmartColors.green,
+                            ),
+                          ),
+                  ),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          species.toUpperCase(),
+                          style: const TextStyle(
+                            fontSize: 11,
+                            letterSpacing: 1,
+                            fontWeight: FontWeight.w800,
                             color: PawmartColors.green,
                           ),
                         ),
-                      ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      pet.petName,
-                      style: const TextStyle(
-                        fontWeight: FontWeight.w800,
-                        fontSize: 16,
-                      ),
+                        const SizedBox(height: 3),
+                        Text(
+                          pet.petName,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            fontSize: 22,
+                            fontWeight: FontWeight.w900,
+                            color: PawmartColors.ink,
+                          ),
+                        ),
+                        Text(
+                          pet.breed?.trim().isNotEmpty == true
+                              ? pet.breed!
+                              : 'Chưa thêm giống',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            fontSize: 13,
+                            color: PawmartColors.muted,
+                          ),
+                        ),
+                      ],
                     ),
-                    const SizedBox(height: 3),
-                    Text(
-                      '${pet.petType == 'CAT'
-                          ? 'Mèo'
-                          : pet.petType == 'DOG'
-                          ? 'Chó'
-                          : 'Thú cưng'} · ${pet.breed ?? 'Chưa rõ giống'}',
-                      style: const TextStyle(
-                        color: PawmartColors.muted,
-                        fontSize: 12,
-                      ),
-                    ),
-                    Text(
-                      '${_age(pet.ageMonths)} · ${pet.weightKg == null ? 'Chưa có cân nặng' : '${pet.weightKg} kg'}',
-                      style: const TextStyle(
-                        color: PawmartColors.muted,
-                        fontSize: 12,
-                      ),
-                    ),
-                    if (pet.bodySize != null ||
-                        pet.activityLevel != null ||
-                        pet.bodyConditionScore != null)
-                      Text(
-                        [
-                          if (pet.bodySize != null)
-                            'Size ${switch (pet.bodySize) {
-                              'SMALL' => 'nhỏ',
-                              'MEDIUM' => 'vừa',
-                              'LARGE' => 'lớn',
-                              _ => pet.bodySize!,
-                            }}',
-                          if (pet.activityLevel != null)
-                            'Vận động ${switch (pet.activityLevel) {
-                              'LOW' => 'ít',
-                              'MODERATE' => 'vừa',
-                              'HIGH' => 'nhiều',
-                              _ => pet.activityLevel!,
-                            }}',
-                          if (pet.bodyConditionScore != null)
-                            'Thể trạng ${pet.bodyConditionScore}/9',
-                        ].join(' · '),
-                        style: const TextStyle(
-                          color: PawmartColors.muted,
-                          fontSize: 12,
+                  ),
+                  PopupMenuButton<String>(
+                    tooltip: 'Tùy chọn hồ sơ',
+                    icon: const Icon(Icons.more_horiz_rounded),
+                    onSelected: (value) {
+                      if (value == 'delete') {
+                        onDelete();
+                      }
+                    },
+                    itemBuilder: (context) => const [
+                      PopupMenuItem(
+                        value: 'delete',
+                        child: Row(
+                          children: [
+                            Icon(
+                              Icons.delete_outline_rounded,
+                              size: 18,
+                              color: PawmartColors.error,
+                            ),
+                            SizedBox(width: 8),
+                            Text(
+                              'Xóa hồ sơ',
+                              style: TextStyle(color: PawmartColors.error),
+                            ),
+                          ],
                         ),
                       ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 18),
+            Row(
+              children: [
+                Expanded(
+                  child: _PetMetric(
+                    icon: Icons.cake_outlined,
+                    label: 'Tuổi',
+                    value: _age(pet.ageMonths),
+                  ),
+                ),
+                Container(
+                  width: 1,
+                  height: 42,
+                  margin: const EdgeInsets.symmetric(horizontal: 10),
+                  color: PawmartColors.line,
+                ),
+                Expanded(
+                  child: _PetMetric(
+                    icon: Icons.monitor_weight_outlined,
+                    label: 'Cân nặng',
+                    value: weight,
+                  ),
+                ),
+              ],
+            ),
+            if (pet.bodySize != null ||
+                pet.activityLevel != null ||
+                pet.bodyConditionScore != null) ...[
+              const SizedBox(height: 12),
+              Wrap(
+                spacing: 7,
+                runSpacing: 7,
+                children: [
+                  if (pet.bodySize != null)
+                    _PetTag(
+                      label: switch (pet.bodySize) {
+                        'SMALL' => 'Size nhỏ',
+                        'MEDIUM' => 'Size vừa',
+                        'LARGE' => 'Size lớn',
+                        _ => pet.bodySize!,
+                      },
+                    ),
+                  if (pet.activityLevel != null)
+                    _PetTag(
+                      label: switch (pet.activityLevel) {
+                        'LOW' => 'Ít vận động',
+                        'MODERATE' => 'Vận động vừa',
+                        'HIGH' => 'Vận động nhiều',
+                        _ => pet.activityLevel!,
+                      },
+                    ),
+                  if (pet.bodyConditionScore != null)
+                    _PetTag(label: 'Thể trạng ${pet.bodyConditionScore}/9'),
+                ],
+              ),
+            ],
+            if (pet.specialNotes?.trim().isNotEmpty == true) ...[
+              const SizedBox(height: 14),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: PawmartColors.cream,
+                  borderRadius: BorderRadius.circular(13),
+                ),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Icon(
+                      Icons.favorite_border_rounded,
+                      size: 17,
+                      color: PawmartColors.amber,
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        pet.specialNotes!,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontSize: 12,
+                          height: 1.35,
+                          color: PawmartColors.muted,
+                        ),
+                      ),
+                    ),
                   ],
                 ),
               ),
             ],
-          ),
-          if (pet.specialNotes?.isNotEmpty ?? false) ...[
-            const SizedBox(height: 12),
-            Align(
-              alignment: Alignment.centerLeft,
-              child: Text(
-                pet.specialNotes!,
-                style: const TextStyle(color: PawmartColors.muted),
-              ),
+            const SizedBox(height: 16),
+            Row(
+              children: [
+                Expanded(
+                  child: FilledButton.tonal(
+                    onPressed: onEdit,
+                    child: const Text('Chỉnh sửa'),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: OutlinedButton(
+                    onPressed: onAssistant,
+                    child: const Text('Tư vấn'),
+                  ),
+                ),
+              ],
             ),
           ],
-          if (pet.feedingHabits?.isNotEmpty ?? false)
-            Align(
-              alignment: Alignment.centerLeft,
-              child: Text(
-                'Thói quen ăn: ${pet.feedingHabits}',
-                style: const TextStyle(color: PawmartColors.muted),
-              ),
-            ),
-          if (pet.foodPreferences?.isNotEmpty ?? false)
-            Align(
-              alignment: Alignment.centerLeft,
-              child: Text(
-                'Sở thích: ${pet.foodPreferences}',
-                style: const TextStyle(color: PawmartColors.muted),
-              ),
-            ),
-          const Divider(height: 28),
-          Row(
-            children: [
-              TextButton.icon(
-                onPressed: onEdit,
-                icon: const Icon(Icons.edit_outlined, size: 18),
-                label: const Text('Chỉnh sửa'),
-              ),
-              const Spacer(),
-              TextButton(onPressed: onAssistant, child: const Text('Tư vấn')),
-              IconButton(
-                tooltip: 'Xóa',
-                onPressed: onDelete,
-                icon: const Icon(
-                  Icons.delete_outline,
-                  color: PawmartColors.error,
-                ),
-              ),
-            ],
-          ),
-        ],
+        ),
       ),
-    ),
-  );
+    );
+  }
 
   static String _age(int? months) {
-    if (months == null) return 'Chưa có tuổi';
+    if (months == null) return 'Chưa rõ';
     final years = months ~/ 12;
     final remain = months % 12;
-    if (years == 0) return '$months tháng tuổi';
+    if (years == 0) return '$months tháng';
     return remain == 0 ? '$years tuổi' : '$years tuổi $remain tháng';
   }
 }
 
-class _PetFormSheet extends StatefulWidget {
-  const _PetFormSheet({this.pet});
+class _PetMetric extends StatelessWidget {
+  const _PetMetric({
+    required this.icon,
+    required this.label,
+    required this.value,
+  });
+
+  final IconData icon;
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Icon(icon, size: 15, color: PawmartColors.green),
+            const SizedBox(width: 5),
+            Expanded(
+              child: Text(
+                label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  fontSize: 11,
+                  color: PawmartColors.muted,
+                ),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 4),
+        Text(
+          value,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: const TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.w800,
+            color: PawmartColors.ink,
+          ),
+        ),
+      ],
+    ),
+  );
+}
+
+class _PetTag extends StatelessWidget {
+  const _PetTag({required this.label});
+
+  final String label;
+
+  @override
+  Widget build(BuildContext context) => Container(
+    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+    decoration: BoxDecoration(
+      color: PawmartColors.cream,
+      borderRadius: BorderRadius.circular(9),
+    ),
+    child: Text(
+      label,
+      style: const TextStyle(
+        fontSize: 11,
+        fontWeight: FontWeight.w700,
+        color: PawmartColors.muted,
+      ),
+    ),
+  );
+}
+
+class PetProfileEditorSheet extends StatefulWidget {
+  const PetProfileEditorSheet({super.key, this.pet});
   final PetProfile? pet;
 
   @override
-  State<_PetFormSheet> createState() => _PetFormSheetState();
+  State<PetProfileEditorSheet> createState() => _PetFormSheetState();
 }
 
-class _PetFormSheetState extends State<_PetFormSheet> {
+class _PetFormSheetState extends State<PetProfileEditorSheet> {
   final _formKey = GlobalKey<FormState>();
   late final TextEditingController _name;
   late final TextEditingController _breed;
-  late final TextEditingController _age;
+  late final TextEditingController _ageYears;
+  late final TextEditingController _ageMonths;
   late final TextEditingController _weight;
   late final TextEditingController _notes;
   late final TextEditingController _feedingHabits;
@@ -333,12 +591,11 @@ class _PetFormSheetState extends State<_PetFormSheet> {
     final pet = widget.pet;
     _name = TextEditingController(text: pet?.petName ?? '');
     _breed = TextEditingController(text: pet?.breed ?? '');
-    _age = TextEditingController(
-      text: pet?.ageMonths == null
-          ? ''
-          : (pet!.ageMonths! / 12).toStringAsFixed(
-              pet.ageMonths! % 12 == 0 ? 0 : 1,
-            ),
+    _ageYears = TextEditingController(
+      text: pet?.ageMonths == null ? '' : '${pet!.ageMonths! ~/ 12}',
+    );
+    _ageMonths = TextEditingController(
+      text: pet?.ageMonths == null ? '' : '${pet!.ageMonths! % 12}',
     );
     _weight = TextEditingController(text: pet?.weightKg?.toString() ?? '');
     _notes = TextEditingController(text: pet?.specialNotes ?? '');
@@ -354,7 +611,8 @@ class _PetFormSheetState extends State<_PetFormSheet> {
   void dispose() {
     _name.dispose();
     _breed.dispose();
-    _age.dispose();
+    _ageYears.dispose();
+    _ageMonths.dispose();
     _weight.dispose();
     _notes.dispose();
     _feedingHabits.dispose();
@@ -363,14 +621,21 @@ class _PetFormSheetState extends State<_PetFormSheet> {
   }
 
   Future<void> _save() async {
-    if (!_formKey.currentState!.validate()) return;
+    if (!_formKey.currentState!.validate()) {
+      setState(() => _error = 'Kiểm tra lại các ô được đánh dấu.');
+      return;
+    }
     setState(() {
       _saving = true;
       _error = null;
     });
-    final ageText = _age.text.trim().replaceAll(',', '.');
+    final yearsText = _ageYears.text.trim();
+    final monthsText = _ageMonths.text.trim();
     final weightText = _weight.text.trim().replaceAll(',', '.');
-    final years = ageText.isEmpty ? null : double.tryParse(ageText);
+    final ageMonths = yearsText.isEmpty && monthsText.isEmpty
+        ? null
+        : (int.parse(yearsText.isEmpty ? '0' : yearsText) * 12) +
+              int.parse(monthsText.isEmpty ? '0' : monthsText);
     final weight = weightText.isEmpty ? null : double.tryParse(weightText);
     final PetsViewModel viewModel;
     try {
@@ -392,7 +657,7 @@ class _PetFormSheetState extends State<_PetFormSheet> {
           'petName': _name.text.trim(),
           'petType': _type,
           'breed': _breed.text.trim().isEmpty ? null : _breed.text.trim(),
-          'ageMonths': years == null ? null : (years * 12).round(),
+          'ageMonths': ageMonths,
           'weightKg': weight,
           'specialNotes': _notes.text.trim().isEmpty
               ? null
@@ -463,222 +728,578 @@ class _PetFormSheetState extends State<_PetFormSheet> {
   }
 
   @override
-  Widget build(BuildContext context) => Padding(
-    padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(context).bottom),
-    child: Container(
-      decoration: const BoxDecoration(
-        color: PawmartColors.cream,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      child: SingleChildScrollView(
-        padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
-        child: Form(
-          key: _formKey,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Center(
-                child: Container(
-                  width: 38,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: Colors.black26,
-                    borderRadius: BorderRadius.circular(3),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 18),
-              Text(
-                widget.pet == null ? 'Thêm hồ sơ thú cưng' : 'Cập nhật hồ sơ',
-                style: Theme.of(context).textTheme.titleLarge
-                    ?.copyWith(fontWeight: FontWeight.w800),
-              ),
-              const SizedBox(height: 16),
-              _PetPhotoPicker(
-                selectedPhoto: _selectedPhoto,
-                existingImageUrl: widget.pet?.imageUrl,
-                onCamera: () => _choosePhoto(ImageSource.camera),
-                onGallery: () => _choosePhoto(ImageSource.gallery),
-              ),
-              const SizedBox(height: 16),
-              TextFormField(
-                controller: _name,
-                textCapitalization: TextCapitalization.words,
-                decoration: const InputDecoration(labelText: 'Tên thú cưng'),
-                validator: (v) => (v?.trim().isNotEmpty ?? false)
-                    ? null
-                    : 'Nhập tên thú cưng.',
-              ),
-              const SizedBox(height: 12),
-              SegmentedButton<String>(
-                segments: const [
-                  ButtonSegment(
-                    value: 'DOG',
-                    label: Text('Chó'),
-                    icon: Icon(Icons.pets),
-                  ),
-                  ButtonSegment(
-                    value: 'CAT',
-                    label: Text('Mèo'),
-                    icon: Icon(Icons.pets_outlined),
-                  ),
-                ],
-                selected: {_type == 'CAT' ? 'CAT' : 'DOG'},
-                onSelectionChanged: (selected) =>
-                    setState(() => _type = selected.first),
-              ),
-              const SizedBox(height: 12),
-              TextFormField(
-                controller: _breed,
-                textCapitalization: TextCapitalization.words,
-                decoration: const InputDecoration(labelText: 'Giống'),
-              ),
-              const SizedBox(height: 12),
-              Row(
-                children: [
-                  Expanded(
-                    child: TextFormField(
-                      controller: _age,
-                      keyboardType: const TextInputType.numberWithOptions(
-                        decimal: true,
-                      ),
-                      decoration: const InputDecoration(
-                        labelText: 'Tuổi (năm)',
-                      ),
-                      validator: (v) {
-                        if (v == null || v.trim().isEmpty) return null;
-                        final n = double.tryParse(
-                          v.trim().replaceAll(',', '.'),
-                        );
-                        return n == null || n < 0 || n > 50
-                            ? 'Tuổi không hợp lệ.'
-                            : null;
-                      },
+  Widget build(BuildContext context) => LayoutBuilder(
+    builder: (context, constraints) {
+      final keyboard = MediaQuery.viewInsetsOf(context).bottom;
+      final available = (constraints.maxHeight - keyboard)
+          .clamp(0.0, double.infinity)
+          .toDouble();
+      final preferred = MediaQuery.sizeOf(context).height * .94;
+      return Padding(
+        padding: EdgeInsets.only(bottom: keyboard),
+        child: SizedBox(
+          height: available < preferred ? available : preferred,
+          child: DecoratedBox(
+            decoration: const BoxDecoration(
+              color: PawmartColors.cream,
+              borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+            ),
+            child: Column(
+              children: [
+                Container(
+                  decoration: const BoxDecoration(
+                    color: PawmartColors.greenDark,
+                    borderRadius: BorderRadius.vertical(
+                      top: Radius.circular(28),
                     ),
                   ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: TextFormField(
-                      controller: _weight,
-                      keyboardType: const TextInputType.numberWithOptions(
-                        decimal: true,
+                  child: Column(
+                    children: [
+                      const SizedBox(height: 10),
+                      Center(
+                        child: Container(
+                          width: 38,
+                          height: 4,
+                          decoration: BoxDecoration(
+                            color: Colors.white38,
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                        ),
                       ),
-                      decoration: const InputDecoration(
-                        labelText: 'Cân nặng (kg)',
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(20, 17, 12, 18),
+                        child: Row(
+                          children: [
+                            Container(
+                              width: 44,
+                              height: 44,
+                              decoration: BoxDecoration(
+                                color: Colors.white.withValues(alpha: .14),
+                                borderRadius: BorderRadius.circular(14),
+                              ),
+                              child: const Icon(
+                                Icons.pets_rounded,
+                                color: Colors.white,
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    widget.pet == null
+                                        ? 'Tạo hồ sơ cho bé'
+                                        : 'Chỉnh sửa hồ sơ',
+                                    style: const TextStyle(
+                                      fontSize: 20,
+                                      fontWeight: FontWeight.w800,
+                                      color: Colors.white,
+                                    ),
+                                  ),
+                                  Text(
+                                    widget.pet == null
+                                        ? 'Để PawMart hiểu bé hơn mỗi ngày'
+                                        : 'Cập nhật thông tin của ${widget.pet!.petName}',
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: const TextStyle(
+                                      fontSize: 12,
+                                      color: Color(0xFFC9E9D8),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            IconButton(
+                              tooltip: 'Đóng',
+                              onPressed: _saving
+                                  ? null
+                                  : () => Navigator.pop(context),
+                              icon: const Icon(
+                                Icons.close_rounded,
+                                color: Colors.white,
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
-                      validator: (v) {
-                        if ((v ?? '').trim().isEmpty) return null;
-                        final n = double.tryParse(
-                          v!.trim().replaceAll(',', '.'),
-                        );
-                        return n == null || n <= 0 || n > 999
-                            ? 'Cân nặng không hợp lệ.'
-                            : null;
-                      },
+                    ],
+                  ),
+                ),
+                Expanded(
+                  child: Form(
+                    key: _formKey,
+                    child: SingleChildScrollView(
+                      keyboardDismissBehavior:
+                          ScrollViewKeyboardDismissBehavior.onDrag,
+                      padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          _PetPhotoPicker(
+                            selectedPhoto: _selectedPhoto,
+                            existingImageUrl: widget.pet?.imageUrl,
+                            onCamera: () => _choosePhoto(ImageSource.camera),
+                            onGallery: () => _choosePhoto(ImageSource.gallery),
+                          ),
+                          const SizedBox(height: 16),
+                          _PetFormSection(
+                            icon: Icons.badge_outlined,
+                            title: 'Thông tin cơ bản',
+                            subtitle: 'Những điều đầu tiên cần biết về bé',
+                            children: [
+                              TextFormField(
+                                controller: _name,
+                                textCapitalization: TextCapitalization.words,
+                                textInputAction: TextInputAction.next,
+                                decoration: const InputDecoration(
+                                  labelText: 'Tên thú cưng *',
+                                  hintText: 'Ví dụ: Miu, Bông, Lucky',
+                                ),
+                                validator: (v) =>
+                                    (v?.trim().isNotEmpty ?? false)
+                                    ? null
+                                    : 'Nhập tên thú cưng.',
+                              ),
+                              Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const Text(
+                                    'Bé là',
+                                    style: TextStyle(
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 8),
+                                  Row(
+                                    children: [
+                                      Expanded(
+                                        child: _PetTypeChoice(
+                                          label: 'Chó',
+                                          icon: Icons.pets_outlined,
+                                          selected: _type == 'DOG',
+                                          onTap: () =>
+                                              setState(() => _type = 'DOG'),
+                                        ),
+                                      ),
+                                      const SizedBox(width: 8),
+                                      Expanded(
+                                        child: _PetTypeChoice(
+                                          label: 'Mèo',
+                                          icon: Icons.pets_rounded,
+                                          selected: _type == 'CAT',
+                                          onTap: () =>
+                                              setState(() => _type = 'CAT'),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ],
+                              ),
+                              TextFormField(
+                                controller: _breed,
+                                textCapitalization: TextCapitalization.words,
+                                textInputAction: TextInputAction.next,
+                                decoration: const InputDecoration(
+                                  labelText: 'Giống',
+                                  hintText: 'Ví dụ: Poodle, Anh lông ngắn',
+                                ),
+                              ),
+                              Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const Text(
+                                    'Tuổi của bé',
+                                    style: TextStyle(
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 8),
+                                  Row(
+                                    children: [
+                                      Expanded(
+                                        child: TextFormField(
+                                          controller: _ageYears,
+                                          keyboardType: TextInputType.number,
+                                          decoration: const InputDecoration(
+                                            labelText: 'Năm',
+                                            hintText: '1',
+                                          ),
+                                          validator: (v) {
+                                            if (v == null || v.trim().isEmpty) {
+                                              return null;
+                                            }
+                                            final years = int.tryParse(
+                                              v.trim(),
+                                            );
+                                            return years == null ||
+                                                    years < 0 ||
+                                                    years > 50
+                                                ? '0–50 năm'
+                                                : null;
+                                          },
+                                        ),
+                                      ),
+                                      const SizedBox(width: 10),
+                                      Expanded(
+                                        child: TextFormField(
+                                          controller: _ageMonths,
+                                          keyboardType: TextInputType.number,
+                                          decoration: const InputDecoration(
+                                            labelText: 'Tháng',
+                                            hintText: '6',
+                                          ),
+                                          validator: (v) {
+                                            if (v == null || v.trim().isEmpty) {
+                                              return null;
+                                            }
+                                            final months = int.tryParse(
+                                              v.trim(),
+                                            );
+                                            final years =
+                                                int.tryParse(
+                                                  _ageYears.text.trim(),
+                                                ) ??
+                                                0;
+                                            return months == null ||
+                                                    months < 0 ||
+                                                    months > 11 ||
+                                                    (years == 50 && months > 0)
+                                                ? '0–11 tháng'
+                                                : null;
+                                          },
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ],
+                              ),
+                              TextFormField(
+                                controller: _weight,
+                                keyboardType:
+                                    const TextInputType.numberWithOptions(
+                                      decimal: true,
+                                    ),
+                                decoration: const InputDecoration(
+                                  labelText: 'Cân nặng (kg)',
+                                  hintText: '4,2',
+                                ),
+                                validator: (v) {
+                                  if ((v ?? '').trim().isEmpty) {
+                                    return null;
+                                  }
+                                  final n = double.tryParse(
+                                    v!.trim().replaceAll(',', '.'),
+                                  );
+                                  return n == null || n <= 0 || n > 999
+                                      ? 'Cân nặng không hợp lệ.'
+                                      : null;
+                                },
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 14),
+                          _PetFormSection(
+                            icon: Icons.monitor_heart_outlined,
+                            title: 'Thể trạng & vận động',
+                            subtitle: 'Giúp tư vấn khẩu phần phù hợp hơn',
+                            children: [
+                              DropdownButtonFormField<String>(
+                                isExpanded: true,
+                                initialValue: _bodySize,
+                                decoration: const InputDecoration(
+                                  labelText: 'Kích cỡ của bé',
+                                ),
+                                items: const [
+                                  DropdownMenuItem(
+                                    value: 'SMALL',
+                                    child: Text('Nhỏ'),
+                                  ),
+                                  DropdownMenuItem(
+                                    value: 'MEDIUM',
+                                    child: Text('Vừa'),
+                                  ),
+                                  DropdownMenuItem(
+                                    value: 'LARGE',
+                                    child: Text('Lớn'),
+                                  ),
+                                ],
+                                onChanged: (value) =>
+                                    setState(() => _bodySize = value),
+                              ),
+                              DropdownButtonFormField<String>(
+                                isExpanded: true,
+                                initialValue: _activityLevel,
+                                decoration: const InputDecoration(
+                                  labelText: 'Mức vận động',
+                                ),
+                                items: const [
+                                  DropdownMenuItem(
+                                    value: 'LOW',
+                                    child: Text('Ít vận động'),
+                                  ),
+                                  DropdownMenuItem(
+                                    value: 'MODERATE',
+                                    child: Text('Vận động vừa'),
+                                  ),
+                                  DropdownMenuItem(
+                                    value: 'HIGH',
+                                    child: Text('Vận động nhiều'),
+                                  ),
+                                ],
+                                onChanged: (value) =>
+                                    setState(() => _activityLevel = value),
+                              ),
+                              DropdownButtonFormField<int>(
+                                isExpanded: true,
+                                initialValue: _bodyConditionScore,
+                                decoration: const InputDecoration(
+                                  labelText: 'Điểm thể trạng (1–9)',
+                                  helperText:
+                                      'Nếu chưa rõ, hãy hỏi bác sĩ thú y.',
+                                ),
+                                items: [
+                                  const DropdownMenuItem<int>(
+                                    value: null,
+                                    child: Text('Chưa rõ'),
+                                  ),
+                                  ...List.generate(
+                                    9,
+                                    (i) => DropdownMenuItem(
+                                      value: i + 1,
+                                      child: Text('${i + 1}/9'),
+                                    ),
+                                  ),
+                                ],
+                                onChanged: (value) =>
+                                    setState(() => _bodyConditionScore = value),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 14),
+                          _PetFormSection(
+                            icon: Icons.restaurant_menu_rounded,
+                            title: 'Ăn uống & sức khỏe',
+                            subtitle: 'Cá nhân hóa gợi ý cho riêng bé',
+                            children: [
+                              TextFormField(
+                                controller: _feedingHabits,
+                                maxLength: 500,
+                                maxLines: 2,
+                                decoration: const InputDecoration(
+                                  labelText: 'Thói quen ăn',
+                                  hintText: 'Ăn chậm, thích nhiều bữa nhỏ…',
+                                ),
+                              ),
+                              TextFormField(
+                                controller: _foodPreferences,
+                                maxLength: 500,
+                                maxLines: 2,
+                                decoration: const InputDecoration(
+                                  labelText: 'Sở thích ăn uống',
+                                  hintText: 'Thích cá, không thích hạt lớn…',
+                                ),
+                              ),
+                              TextFormField(
+                                controller: _notes,
+                                maxLines: 3,
+                                textCapitalization:
+                                    TextCapitalization.sentences,
+                                decoration: const InputDecoration(
+                                  labelText: 'Sức khỏe và dị ứng',
+                                  hintText: 'Điều cần lưu ý khi chọn thức ăn',
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
                     ),
                   ),
-                ],
-              ),
-              const SizedBox(height: 12),
-              DropdownButtonFormField<String>(
-                initialValue: _bodySize,
-                decoration: const InputDecoration(labelText: 'Kích cỡ của bé'),
-                items: const [
-                  DropdownMenuItem(value: 'SMALL', child: Text('Nhỏ')),
-                  DropdownMenuItem(value: 'MEDIUM', child: Text('Vừa')),
-                  DropdownMenuItem(value: 'LARGE', child: Text('Lớn')),
-                ],
-                onChanged: (value) => setState(() => _bodySize = value),
-              ),
-              const SizedBox(height: 12),
-              DropdownButtonFormField<String>(
-                initialValue: _activityLevel,
-                decoration: const InputDecoration(labelText: 'Mức vận động'),
-                items: const [
-                  DropdownMenuItem(value: 'LOW', child: Text('Ít')),
-                  DropdownMenuItem(value: 'MODERATE', child: Text('Vừa')),
-                  DropdownMenuItem(value: 'HIGH', child: Text('Nhiều')),
-                ],
-                onChanged: (value) => setState(() => _activityLevel = value),
-              ),
-              const SizedBox(height: 12),
-              DropdownButtonFormField<int>(
-                initialValue: _bodyConditionScore,
-                decoration: const InputDecoration(
-                  labelText: 'Điểm thể trạng (1–9, nếu đã biết)',
-                  helperText:
-                      'Nên hỏi bác sĩ thú y nếu chưa biết cách đánh giá.',
                 ),
-                items: [
-                  const DropdownMenuItem<int>(
-                    value: null,
-                    child: Text('Chưa rõ'),
+                DecoratedBox(
+                  decoration: const BoxDecoration(
+                    color: Colors.white,
+                    border: Border(top: BorderSide(color: PawmartColors.line)),
                   ),
-                  ...List.generate(
-                    9,
-                    (i) => DropdownMenuItem(
-                      value: i + 1,
-                      child: Text('${i + 1}/9'),
+                  child: SafeArea(
+                    top: false,
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(20, 12, 20, 12),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          if (_error != null) ...[
+                            Row(
+                              children: [
+                                const Icon(
+                                  Icons.error_outline_rounded,
+                                  size: 17,
+                                  color: PawmartColors.error,
+                                ),
+                                const SizedBox(width: 7),
+                                Expanded(
+                                  child: Text(
+                                    _error!,
+                                    maxLines: 2,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: const TextStyle(
+                                      fontSize: 12,
+                                      color: PawmartColors.error,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 10),
+                          ],
+                          SizedBox(
+                            width: double.infinity,
+                            child: FilledButton.icon(
+                              onPressed: _saving ? null : _save,
+                              icon: _saving
+                                  ? const SizedBox.square(
+                                      dimension: 18,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                        color: Colors.white,
+                                      ),
+                                    )
+                                  : const Icon(Icons.check_rounded),
+                              label: Text(
+                                widget.pet == null
+                                    ? 'Tạo hồ sơ'
+                                    : 'Lưu thay đổi',
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
-                ],
-                onChanged: (value) =>
-                    setState(() => _bodyConditionScore = value),
-              ),
-              const SizedBox(height: 12),
-              TextFormField(
-                controller: _feedingHabits,
-                maxLength: 500,
-                maxLines: 2,
-                decoration: const InputDecoration(
-                  labelText: 'Thói quen ăn',
-                  hintText: 'Ví dụ: ăn chậm, thích nhiều bữa nhỏ',
-                ),
-              ),
-              const SizedBox(height: 12),
-              TextFormField(
-                controller: _foodPreferences,
-                maxLength: 500,
-                maxLines: 2,
-                decoration: const InputDecoration(
-                  labelText: 'Sở thích ăn uống',
-                  hintText: 'Ví dụ: thích cá, không thích hạt lớn',
-                ),
-              ),
-              const SizedBox(height: 12),
-              TextFormField(
-                controller: _notes,
-                maxLines: 3,
-                textCapitalization: TextCapitalization.sentences,
-                decoration: const InputDecoration(
-                  labelText: 'Ghi chú sức khỏe và dị ứng',
-                ),
-              ),
-              if (_error != null) ...[
-                const SizedBox(height: 10),
-                Text(
-                  _error!,
-                  style: const TextStyle(color: PawmartColors.error),
                 ),
               ],
-              const SizedBox(height: 18),
-              FilledButton(
-                onPressed: _saving ? null : _save,
-                child: _saving
-                    ? const SizedBox.square(
-                        dimension: 20,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          color: Colors.white,
-                        ),
-                      )
-                    : const Text('Lưu hồ sơ'),
-              ),
-            ],
+            ),
           ),
         ),
+      );
+    },
+  );
+}
+
+class _PetTypeChoice extends StatelessWidget {
+  const _PetTypeChoice({
+    required this.label,
+    required this.icon,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final String label;
+  final IconData icon;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) => Material(
+    color: selected ? PawmartColors.green : PawmartColors.cream,
+    borderRadius: BorderRadius.circular(14),
+    child: InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(14),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 13),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              icon,
+              size: 18,
+              color: selected ? Colors.white : PawmartColors.green,
+            ),
+            const SizedBox(width: 7),
+            Text(
+              label,
+              style: TextStyle(
+                fontWeight: FontWeight.w800,
+                color: selected ? Colors.white : PawmartColors.ink,
+              ),
+            ),
+          ],
+        ),
       ),
+    ),
+  );
+}
+
+class _PetFormSection extends StatelessWidget {
+  const _PetFormSection({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.children,
+  });
+
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final List<Widget> children;
+
+  @override
+  Widget build(BuildContext context) => Container(
+    padding: const EdgeInsets.all(18),
+    decoration: BoxDecoration(
+      color: Colors.white,
+      border: Border.all(color: PawmartColors.line),
+      borderRadius: BorderRadius.circular(22),
+    ),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Container(
+              width: 38,
+              height: 38,
+              decoration: BoxDecoration(
+                color: PawmartColors.greenPale,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Icon(icon, size: 20, color: PawmartColors.green),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                  Text(
+                    subtitle,
+                    style: const TextStyle(
+                      fontSize: 12,
+                      color: PawmartColors.muted,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 18),
+        for (var index = 0; index < children.length; index++) ...[
+          if (index > 0) const SizedBox(height: 12),
+          children[index],
+        ],
+      ],
     ),
   );
 }
@@ -698,72 +1319,120 @@ class _PetPhotoPicker extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final api = context.read<ApiClient>();
     final existingUri = existingImageUrl == null || existingImageUrl!.isEmpty
         ? null
-        : api.resolveMediaUri(existingImageUrl!).toString();
+        : context
+              .read<ApiClient>()
+              .resolveMediaUri(existingImageUrl!)
+              .toString();
+    Widget placeholder() => const ColoredBox(
+      color: Colors.white,
+      child: Icon(Icons.pets_rounded, size: 46, color: PawmartColors.green),
+    );
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Text(
-          'Ảnh thú cưng',
-          style: TextStyle(fontWeight: FontWeight.w700),
-        ),
-        const SizedBox(height: 8),
-        Center(
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(16),
-            child: SizedBox(
-              width: 144,
-              height: 120,
-              child: selectedPhoto != null
-                  ? Image.file(File(selectedPhoto!.path), fit: BoxFit.cover)
-                  : existingUri == null
-                  ? const ColoredBox(
-                      color: PawmartColors.greenPale,
-                      child: Icon(
-                        Icons.pets,
-                        size: 42,
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: PawmartColors.greenPale,
+        borderRadius: BorderRadius.circular(22),
+      ),
+      child: Row(
+        children: [
+          Semantics(
+            button: true,
+            label: 'Chọn ảnh của bé',
+            child: GestureDetector(
+              onTap: onGallery,
+              child: Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(20),
+                    child: SizedBox(
+                      width: 110,
+                      height: 122,
+                      child: selectedPhoto != null
+                          ? Image.file(
+                              File(selectedPhoto!.path),
+                              fit: BoxFit.cover,
+                              errorBuilder: (_, _, _) => placeholder(),
+                            )
+                          : existingUri == null
+                          ? placeholder()
+                          : Image.network(
+                              existingUri,
+                              fit: BoxFit.cover,
+                              errorBuilder: (_, _, _) => placeholder(),
+                            ),
+                    ),
+                  ),
+                  Positioned(
+                    right: -5,
+                    bottom: -5,
+                    child: DecoratedBox(
+                      decoration: BoxDecoration(
                         color: PawmartColors.green,
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: Colors.white, width: 2),
                       ),
-                    )
-                  : Image.network(
-                      existingUri,
-                      fit: BoxFit.cover,
-                      errorBuilder: (_, _, _) => const ColoredBox(
-                        color: PawmartColors.greenPale,
+                      child: const Padding(
+                        padding: EdgeInsets.all(6),
                         child: Icon(
-                          Icons.pets,
-                          size: 42,
-                          color: PawmartColors.green,
+                          Icons.photo_camera_rounded,
+                          size: 18,
+                          color: Colors.white,
                         ),
                       ),
                     ),
+                  ),
+                ],
+              ),
             ),
           ),
-        ),
-        const SizedBox(height: 8),
-        Row(
-          children: [
-            Expanded(
-              child: OutlinedButton.icon(
-                onPressed: onCamera,
-                icon: const Icon(Icons.photo_camera_outlined),
-                label: const Text('Chụp ảnh'),
-              ),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Ảnh của bé',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w800,
+                    color: PawmartColors.ink,
+                  ),
+                ),
+                const SizedBox(height: 3),
+                const Text(
+                  'Thêm ảnh để hồ sơ gần gũi hơn.',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: PawmartColors.muted,
+                    height: 1.25,
+                  ),
+                ),
+                const SizedBox(height: 10),
+                SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton.icon(
+                    onPressed: onGallery,
+                    icon: const Icon(Icons.photo_library_outlined, size: 17),
+                    label: const Text('Thư viện'),
+                  ),
+                ),
+                SizedBox(
+                  width: double.infinity,
+                  child: TextButton.icon(
+                    onPressed: onCamera,
+                    icon: const Icon(Icons.photo_camera_outlined, size: 17),
+                    label: const Text('Chụp ảnh'),
+                  ),
+                ),
+              ],
             ),
-            const SizedBox(width: 8),
-            Expanded(
-              child: OutlinedButton.icon(
-                onPressed: onGallery,
-                icon: const Icon(Icons.photo_library_outlined),
-                label: const Text('Thư viện'),
-              ),
-            ),
-          ],
-        ),
-      ],
+          ),
+        ],
+      ),
     );
   }
 }

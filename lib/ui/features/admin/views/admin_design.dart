@@ -3,15 +3,15 @@ import 'package:flutter/material.dart';
 import '../../../core/app_theme.dart';
 
 abstract final class AdminPalette {
-  static const background = Color(0xFFF5F7F3);
-  static const forest = Color(0xFF183F2B);
-  static const green = Color(0xFF28733A);
-  static const softGreen = Color(0xFFE8F2E8);
-  static const ink = Color(0xFF17251D);
-  static const secondary = Color(0xFF68766D);
-  static const border = Color(0xFFE2E9E1);
-  static const amber = Color(0xFFAA671D);
-  static const softAmber = Color(0xFFFFF2DF);
+  static const background = PawmartColors.cream;
+  static const forest = PawmartColors.greenDark;
+  static const green = PawmartColors.green;
+  static const softGreen = PawmartColors.greenPale;
+  static const ink = PawmartColors.ink;
+  static const secondary = PawmartColors.muted;
+  static const border = PawmartColors.line;
+  static const amber = PawmartColors.amber;
+  static const softAmber = PawmartColors.amberPale;
   static const red = Color(0xFFB64949);
   static const softRed = Color(0xFFFBECEC);
   static const blue = Color(0xFF3769A0);
@@ -61,7 +61,7 @@ class AdminSurface extends StatelessWidget {
     decoration: BoxDecoration(
       color: Colors.white,
       border: Border.all(color: AdminPalette.border),
-      borderRadius: BorderRadius.circular(18),
+      borderRadius: BorderRadius.circular(20),
     ),
     child: child,
   );

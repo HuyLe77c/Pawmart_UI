@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
 import '../../../../data/services/api_client.dart';
@@ -67,7 +68,13 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
   Widget build(BuildContext context) => Scaffold(
     appBar: AppBar(
       title: const Text('Thông báo'),
-      actions: [IconButton(onPressed: load, icon: const Icon(Icons.refresh))],
+      actions: [
+        IconButton(
+          tooltip: 'Làm mới thông báo',
+          onPressed: load,
+          icon: const Icon(Icons.refresh_rounded),
+        ),
+      ],
     ),
     body: loading
         ? const LoadingState()
@@ -86,7 +93,12 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
               itemCount: items.length,
               separatorBuilder: (_, _) => const SizedBox(height: 8),
               itemBuilder: (context, index) {
-                final item = Map<String, dynamic>.from(items[index] as Map);
+                final item = items[index] as Map<String, dynamic>;
+                final createdAt = DateTime.tryParse('${item['createdAt']}');
+                final dateLabel = createdAt == null
+                    ? ''
+                    : DateFormat('dd/MM/yyyy · HH:mm')
+                          .format(createdAt.toLocal());
                 return Card(
                   color: item['isRead'] == true
                       ? Colors.white
@@ -114,7 +126,23 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                             : FontWeight.bold,
                       ),
                     ),
-                    subtitle: Text('${item['message']}\n${item['createdAt']}'),
+                    subtitle: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const SizedBox(height: 4),
+                        Text('${item['message']}'),
+                        if (dateLabel.isNotEmpty) ...[
+                          const SizedBox(height: 6),
+                          Text(
+                            dateLabel,
+                            style: const TextStyle(
+                              fontSize: 11,
+                              color: PawmartColors.muted,
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
                     isThreeLine: true,
                   ),
                 );

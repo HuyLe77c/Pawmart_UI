@@ -8,8 +8,10 @@ import '../../../../data/services/api_client.dart';
 import '../../../../domain/models/category.dart';
 import '../../../../domain/models/product.dart';
 import '../../../core/app_theme.dart';
+import '../../../core/category_label.dart';
 import '../../../core/formatters.dart';
 import '../../../core/widgets/feedback_states.dart';
+import '../../../core/widgets/brand_lockup.dart';
 import '../../../core/widgets/product_artwork.dart';
 import '../../../core/widgets/product_card.dart';
 import '../view_models/home_view_model.dart';
@@ -94,7 +96,6 @@ class _HomeContentState extends State<_HomeContent> {
                     slivers: [
                       SliverToBoxAdapter(child: _HomeHeader()),
                       SliverToBoxAdapter(child: _SearchShortcut()),
-                      SliverToBoxAdapter(child: _ChatAiShortcut()),
                       if (model.featured.isNotEmpty)
                         SliverToBoxAdapter(
                           child: Padding(
@@ -114,6 +115,7 @@ class _HomeContentState extends State<_HomeContent> {
                             ),
                           ),
                         ),
+                      SliverToBoxAdapter(child: _ChatAiShortcut()),
                       if (model.categories.isNotEmpty) ...[
                         SliverToBoxAdapter(
                           child: _SectionTitle(
@@ -188,26 +190,34 @@ class _HomeContentState extends State<_HomeContent> {
 class _HomeHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.fromLTRB(20, 8, 12, 10),
-    child: Row(
+    padding: const EdgeInsets.fromLTRB(20, 14, 12, 20),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Icon(Icons.pets_rounded, color: PawmartColors.green, size: 25),
-        const SizedBox(width: 8),
-        const Expanded(
-          child: Text(
-            'PawMart',
-            style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800),
-          ),
+        Row(
+          children: [
+            const Expanded(child: BrandLockup(compact: true)),
+            IconButton(
+              tooltip: 'Thông báo',
+              onPressed: () => context.go('/customer/notifications'),
+              icon: const Icon(Icons.notifications_none_rounded),
+            ),
+            IconButton(
+              tooltip: 'Giỏ hàng',
+              onPressed: () => context.go('/customer/cart'),
+              icon: const Icon(Icons.shopping_bag_outlined),
+            ),
+          ],
         ),
-        IconButton(
-          tooltip: 'Thông báo',
-          onPressed: () => context.go('/customer/notifications'),
-          icon: const Icon(Icons.notifications_none_rounded),
+        const SizedBox(height: 24),
+        Text(
+          'Mọi thứ cho bé cưng.',
+          style: Theme.of(context).textTheme.headlineMedium,
         ),
-        IconButton(
-          tooltip: 'Giỏ hàng',
-          onPressed: () => context.go('/customer/cart'),
-          icon: const Icon(Icons.shopping_bag_outlined),
+        const SizedBox(height: 5),
+        const Text(
+          'Chọn món phù hợp, đặt hàng thật dễ dàng.',
+          style: TextStyle(color: PawmartColors.muted, fontSize: 14),
         ),
       ],
     ),
@@ -220,16 +230,16 @@ class _SearchShortcut extends StatelessWidget {
     padding: const EdgeInsets.symmetric(horizontal: 20),
     child: Material(
       color: Colors.white,
-      borderRadius: BorderRadius.circular(14),
+      borderRadius: BorderRadius.circular(16),
       child: InkWell(
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(16),
         onTap: () => context.go('/customer/categories'),
         child: Container(
-          height: 52,
+          height: 56,
           padding: const EdgeInsets.symmetric(horizontal: 16),
           decoration: BoxDecoration(
             border: Border.all(color: PawmartColors.line),
-            borderRadius: BorderRadius.circular(14),
+            borderRadius: BorderRadius.circular(16),
           ),
           child: const Row(
             children: [
@@ -241,11 +251,7 @@ class _SearchShortcut extends StatelessWidget {
                   style: TextStyle(color: PawmartColors.muted),
                 ),
               ),
-              Icon(
-                Icons.arrow_forward_rounded,
-                color: PawmartColors.ink,
-                size: 20,
-              ),
+              Icon(Icons.tune_rounded, color: PawmartColors.green, size: 20),
             ],
           ),
         ),
@@ -257,41 +263,53 @@ class _SearchShortcut extends StatelessWidget {
 class _ChatAiShortcut extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
+    padding: const EdgeInsets.fromLTRB(20, 14, 20, 0),
     child: Card(
-      color: PawmartColors.greenPale,
+      color: Colors.white,
       child: InkWell(
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(20),
         onTap: () => context.go('/customer/chat-ai'),
         child: const Padding(
-          padding: EdgeInsets.all(16),
+          padding: EdgeInsets.all(14),
           child: Row(
             children: [
               CircleAvatar(
-                backgroundColor: PawmartColors.green,
-                child: Icon(Icons.smart_toy_outlined, color: Colors.white),
+                radius: 25,
+                backgroundColor: PawmartColors.greenPale,
+                child: Icon(
+                  Icons.forum_outlined,
+                  color: PawmartColors.greenDark,
+                ),
               ),
-              SizedBox(width: 12),
+              SizedBox(width: 14),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Chat AI',
+                      'Hỏi PawMart AI',
                       style: TextStyle(
                         fontWeight: FontWeight.w800,
-                        fontSize: 16,
+                        fontSize: 15,
+                        color: PawmartColors.ink,
                       ),
                     ),
-                    SizedBox(height: 3),
+                    SizedBox(height: 2),
                     Text(
-                      'Hỏi về sản phẩm, đơn hàng hoặc chăm sóc thú cưng',
-                      style: TextStyle(fontSize: 12),
+                      'Sản phẩm, đơn hàng và chăm sóc thú cưng',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: PawmartColors.muted,
+                      ),
                     ),
                   ],
                 ),
               ),
-              Icon(Icons.arrow_forward_rounded, color: PawmartColors.green),
+              Icon(
+                Icons.arrow_forward_ios_rounded,
+                color: PawmartColors.green,
+                size: 16,
+              ),
             ],
           ),
         ),
@@ -306,15 +324,15 @@ class _SpotlightCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Material(
-    color: const Color(0xFFF0EDE5),
-    borderRadius: BorderRadius.circular(18),
+    color: PawmartColors.greenDark,
+    borderRadius: BorderRadius.circular(24),
     clipBehavior: Clip.antiAlias,
     child: InkWell(
       onTap: () => context.push('/products/${product.productId}'),
       child: SizedBox(
-        height: 188,
+        height: 202,
         child: Padding(
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.all(18),
           child: Row(
             children: [
               Expanded(
@@ -325,10 +343,10 @@ class _SpotlightCard extends StatelessWidget {
                     const Text(
                       'SẢN PHẨM NỔI BẬT',
                       style: TextStyle(
-                        color: PawmartColors.greenDark,
-                        fontSize: 10,
+                        color: Color(0xFFC9E9D8),
+                        fontSize: 11,
                         fontWeight: FontWeight.w800,
-                        letterSpacing: .7,
+                        letterSpacing: 1,
                       ),
                     ),
                     const SizedBox(height: 9),
@@ -337,8 +355,8 @@ class _SpotlightCard extends StatelessWidget {
                       maxLines: 3,
                       overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
-                        color: PawmartColors.ink,
-                        fontSize: 17,
+                        color: Colors.white,
+                        fontSize: 18,
                         height: 1.2,
                         fontWeight: FontWeight.w800,
                       ),
@@ -347,26 +365,26 @@ class _SpotlightCard extends StatelessWidget {
                     Text(
                       formatVnd(product.price),
                       style: const TextStyle(
-                        color: PawmartColors.greenDark,
+                        color: Colors.white,
                         fontWeight: FontWeight.w800,
-                        fontSize: 16,
+                        fontSize: 17,
                       ),
                     ),
-                    const SizedBox(height: 5),
+                    const SizedBox(height: 8),
                     const Row(
                       children: [
                         Text(
                           'Xem sản phẩm',
                           style: TextStyle(
-                            color: PawmartColors.ink,
-                            fontSize: 12,
-                            fontWeight: FontWeight.w600,
+                            color: Color(0xFFC9E9D8),
+                            fontSize: 13,
+                            fontWeight: FontWeight.w700,
                           ),
                         ),
                         SizedBox(width: 4),
                         Icon(
                           Icons.arrow_forward_rounded,
-                          color: PawmartColors.ink,
+                          color: Color(0xFFC9E9D8),
                           size: 16,
                         ),
                       ],
@@ -374,16 +392,16 @@ class _SpotlightCard extends StatelessWidget {
                   ],
                 ),
               ),
-              const SizedBox(width: 12),
+              const SizedBox(width: 14),
               Expanded(
                 flex: 5,
                 child: ClipRRect(
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(18),
                   child: ColoredBox(
-                    color: Colors.white,
+                    color: const Color(0xFFF2F5F0),
                     child: ProductArtwork(
                       imageUrl: product.primaryImageUrl,
-                      height: 156,
+                      height: 166,
                     ),
                   ),
                 ),
@@ -493,7 +511,7 @@ class _CategoryCard extends StatelessWidget {
                 ),
               ),
             Text(
-              category.categoryName,
+              displayCategoryName(category.categoryName),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
