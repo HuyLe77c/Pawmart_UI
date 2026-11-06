@@ -16,6 +16,37 @@ class ProductImage {
   );
 }
 
+class CatalogReviewSummary {
+  const CatalogReviewSummary({
+    required this.modelStatus,
+    required this.imageStatus,
+    required this.priceStatus,
+    required this.productStatus,
+    required this.publicPreview,
+    required this.officialUrl,
+    this.shortDescription,
+  });
+
+  final String modelStatus;
+  final String imageStatus;
+  final String priceStatus;
+  final String productStatus;
+  final bool publicPreview;
+  final String officialUrl;
+  final String? shortDescription;
+
+  factory CatalogReviewSummary.fromJson(Map<String, dynamic> json) =>
+      CatalogReviewSummary(
+        modelStatus: json['modelStatus'] as String? ?? 'NEEDS_REVIEW',
+        imageStatus: json['imageStatus'] as String? ?? 'NEEDS_REVIEW',
+        priceStatus: json['priceStatus'] as String? ?? 'NEEDS_REVIEW',
+        productStatus: json['productStatus'] as String? ?? 'NEEDS_REVIEW',
+        publicPreview: json['publicPreview'] as bool? ?? false,
+        officialUrl: json['officialUrl'] as String? ?? '',
+        shortDescription: json['shortDescription'] as String?,
+      );
+}
+
 class Product {
   const Product({
     required this.productId,
@@ -36,6 +67,7 @@ class Product {
     this.packageSize,
     this.lifeStage,
     this.feedingGuide,
+    this.catalogReview,
   });
 
   final int productId;
@@ -56,6 +88,26 @@ class Product {
   final String? packageSize;
   final String? lifeStage;
   final String? feedingGuide;
+  final CatalogReviewSummary? catalogReview;
+
+  bool get isPreview => !isActive && catalogReview?.publicPreview == true;
+  bool get hasPublishedPrice =>
+      price > 0 &&
+      (catalogReview == null ||
+          catalogReview!.priceStatus == 'VERIFIED' ||
+          catalogReview!.priceStatus == 'OWNER_SET');
+  bool get hasVerifiedImage =>
+      catalogReview == null || catalogReview!.imageStatus == 'VERIFIED';
+  bool get canPurchase =>
+      isActive &&
+      stockQuantity > 0 &&
+      (catalogReview == null ||
+          (catalogReview!.imageStatus == 'VERIFIED' &&
+              ((catalogReview!.modelStatus == 'VERIFIED' &&
+                      catalogReview!.priceStatus == 'VERIFIED' &&
+                      catalogReview!.productStatus == 'VERIFIED') ||
+                  (catalogReview!.priceStatus == 'OWNER_SET' &&
+                      catalogReview!.productStatus == 'OWNER_APPROVED'))));
 
   String? get primaryImageUrl {
     if (images.isEmpty) return null;
@@ -86,5 +138,10 @@ class Product {
     packageSize: json['packageSize'] as String?,
     lifeStage: json['lifeStage'] as String?,
     feedingGuide: json['feedingGuide'] as String?,
+    catalogReview: json['catalogReview'] is Map<String, dynamic>
+        ? CatalogReviewSummary.fromJson(
+            json['catalogReview'] as Map<String, dynamic>,
+          )
+        : null,
   );
 }

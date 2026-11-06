@@ -2,6 +2,7 @@ import 'dart:io';
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 
@@ -12,6 +13,11 @@ import '../../../core/widgets/feedback_states.dart';
 import '../../../core/widgets/product_artwork.dart';
 import '../../auth/view_models/auth_view_model.dart';
 import 'admin_design.dart';
+
+String _compactOrderId(Object? value) {
+  final id = '$value';
+  return id.length > 8 ? id.substring(0, 8).toUpperCase() : id.toUpperCase();
+}
 
 class AdminOverviewScreen extends StatefulWidget {
   const AdminOverviewScreen({super.key});
@@ -292,7 +298,7 @@ class _AdminOverviewScreenState extends State<AdminOverviewScreen> {
                                         CrossAxisAlignment.start,
                                     children: [
                                       Text(
-                                        'Đơn #${recentOrders[i]['orderId']}',
+                                        'Đơn #${_compactOrderId(recentOrders[i]['orderId'])}',
                                         style: const TextStyle(
                                           fontWeight: FontWeight.w700,
                                           color: AdminPalette.ink,
@@ -434,6 +440,56 @@ class _AdminProductsScreenState extends State<AdminProductsScreen> {
     }
   }
 
+  Future<void> showCatalogReview(Map<String, dynamic> product) async {
+    try {
+      final data = await context.read<AppDependencies>().apiClient.getJson(
+        'api/admin/products/${product['productId']}/catalog-review',
+      ) as Map<String, dynamic>;
+      if (!mounted) return;
+      String state(String key) =>
+          data[key] == 'VERIFIED' ? 'Đã xác minh' : 'Cần kiểm tra';
+      await showDialog<void>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('Kiểm duyệt sản phẩm'),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('${data['modelName']}'),
+                const SizedBox(height: 12),
+                Text('Model: ${state('modelStatus')}'),
+                Text('Ảnh: ${state('imageStatus')}'),
+                Text(
+                  'Giá VNĐ: ${state('priceStatus') == 'OWNER_SET' ? 'PawMart tự đặt' : state('priceStatus')}',
+                ),
+                Text(
+                  'Mở bán: ${state('productStatus') == 'OWNER_APPROVED' ? 'PawMart đã duyệt' : state('productStatus')}',
+                ),
+                const SizedBox(height: 12),
+                const Text('Nguồn sản phẩm'),
+                SelectableText('${data['officialUrl']}'),
+                if ((data['reviewNote'] as String?)?.isNotEmpty == true) ...[
+                  const SizedBox(height: 12),
+                  Text('${data['reviewNote']}'),
+                ],
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Đóng'),
+            ),
+          ],
+        ),
+      );
+    } catch (e) {
+      _snack(_error(e));
+    }
+  }
+
   Future<void> edit([Map<String, dynamic>? product]) async {
     if (categories.isEmpty) {
       _snack('Cần tạo danh mục trước.');
@@ -558,26 +614,30 @@ class _AdminProductsScreenState extends State<AdminProductsScreen> {
                       const SizedBox(height: 16),
                       const _AdminFilterLabel('DANH MỤC'),
                       const SizedBox(height: 8),
-                      Wrap(
-                        spacing: 7,
-                        runSpacing: 7,
-                        children: [
-                          _AdminFilterPill(
-                            label: 'Tất cả',
-                            selected: selectedCategoryId == null,
-                            onTap: () => changeFilter(field: 'category'),
-                          ),
-                          for (final raw in categories)
+                      SingleChildScrollView(
+                        scrollDirection: Axis.horizontal,
+                        child: Row(
+                          children: [
                             _AdminFilterPill(
-                              label:
-                                  '${(raw as Map)['categoryName']}  ${_categoryCount(raw['categoryId'] as int)}',
-                              selected: selectedCategoryId == raw['categoryId'],
-                              onTap: () => changeFilter(
-                                field: 'category',
-                                categoryId: raw['categoryId'] as int,
-                              ),
+                              label: 'Tất cả',
+                              selected: selectedCategoryId == null,
+                              onTap: () => changeFilter(field: 'category'),
                             ),
-                        ],
+                            for (final raw in categories) ...[
+                              const SizedBox(width: 7),
+                              _AdminFilterPill(
+                                label:
+                                    '${(raw as Map)['categoryName']}  ${_categoryCount(raw['categoryId'] as int)}',
+                                selected:
+                                    selectedCategoryId == raw['categoryId'],
+                                onTap: () => changeFilter(
+                                  field: 'category',
+                                  categoryId: raw['categoryId'] as int,
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
                       ),
                       const SizedBox(height: 10),
                       Row(
@@ -758,6 +818,14 @@ class _AdminProductsScreenState extends State<AdminProductsScreen> {
                               )
                               .firstOrNull;
                           final stock = p['stockQuantity'] as int? ?? 0;
+                          final review = p['catalogReview'] as Map?;
+                          final priceNeedsReview =
+                              review != null &&
+                              review['priceStatus'] != 'VERIFIED' &&
+                              review['priceStatus'] != 'OWNER_SET';
+                          final imageNeedsReview =
+                              review != null &&
+                              review['imageStatus'] != 'VERIFIED';
                           final lowThreshold =
                               p['lowStockThreshold'] as int? ?? 5;
                           return Padding(
@@ -788,10 +856,21 @@ class _AdminProductsScreenState extends State<AdminProductsScreen> {
                                             child: SizedBox(
                                               width: 64,
                                               height: 64,
-                                              child: ProductArtwork(
-                                                imageUrl: imageUrl,
-                                                height: 64,
-                                              ),
+                                              child: imageNeedsReview
+                                                  ? const ColoredBox(
+                                                      color: AdminPalette
+                                                          .background,
+                                                      child: Icon(
+                                                        Icons
+                                                            .image_not_supported_outlined,
+                                                        color: AdminPalette
+                                                            .secondary,
+                                                      ),
+                                                    )
+                                                  : ProductArtwork(
+                                                      imageUrl: imageUrl,
+                                                      height: 64,
+                                                    ),
                                             ),
                                           ),
                                           const SizedBox(width: 12),
@@ -829,7 +908,11 @@ class _AdminProductsScreenState extends State<AdminProductsScreen> {
                                                 ),
                                                 const SizedBox(height: 5),
                                                 Text(
-                                                  formatVnd(p['price'] as num),
+                                                  priceNeedsReview
+                                                      ? 'Chưa xác minh giá'
+                                                      : formatVnd(
+                                                          p['price'] as num,
+                                                        ),
                                                   style: const TextStyle(
                                                     fontSize: 15,
                                                     fontWeight: FontWeight.w800,
@@ -839,11 +922,24 @@ class _AdminProductsScreenState extends State<AdminProductsScreen> {
                                               ],
                                             ),
                                           ),
-                                          const Icon(
-                                            Icons.edit_outlined,
-                                            color: AdminPalette.secondary,
-                                            size: 19,
-                                          ),
+                                          review == null
+                                              ? const Icon(
+                                                  Icons.edit_outlined,
+                                                  color: AdminPalette.secondary,
+                                                  size: 19,
+                                                )
+                                              : IconButton(
+                                                  tooltip:
+                                                      'Nguồn và kiểm duyệt',
+                                                  onPressed: () =>
+                                                      showCatalogReview(p),
+                                                  icon: const Icon(
+                                                    Icons.fact_check_outlined,
+                                                    color:
+                                                        AdminPalette.secondary,
+                                                    size: 20,
+                                                  ),
+                                                ),
                                         ],
                                       ),
                                       const SizedBox(height: 3),
@@ -857,7 +953,13 @@ class _AdminProductsScreenState extends State<AdminProductsScreen> {
                                           const SizedBox(width: 10),
                                           Expanded(
                                             child: Text(
-                                              stock <= 0
+                                              review != null &&
+                                                      review['productStatus'] !=
+                                                          'VERIFIED' &&
+                                                      review['productStatus'] !=
+                                                          'OWNER_APPROVED'
+                                                  ? 'Chờ kiểm duyệt'
+                                                  : stock <= 0
                                                   ? 'Hết hàng'
                                                   : stock <= lowThreshold
                                                   ? 'Sắp hết · $stock'
@@ -1545,18 +1647,106 @@ class _AdminOrdersScreenState extends State<AdminOrdersScreen> {
         'api/admin/orders/${order['orderId']}',
       ) as Map<String, dynamic>;
       if (!mounted) return;
-      final change = await showModalBottomSheet<bool>(
+      final change = await showModalBottomSheet<String>(
         context: context,
         isScrollControlled: true,
         showDragHandle: true,
         backgroundColor: AdminPalette.background,
         builder: (context) => _AdminOrderDetails(detail: detail),
       );
-      if (change == true && mounted) await move(order);
+      if (change == 'STATUS' && mounted) await move(order);
+      if (change == 'PAYMENT' && mounted) await confirmPayment(detail);
     } catch (e) {
       if (mounted)
         ScaffoldMessenger.of(context)
             .showSnackBar(SnackBar(content: Text(_error(e))));
+    }
+  }
+
+  Future<void> confirmPayment(Map<String, dynamic> detail) async {
+    final isQr = detail['paymentMethod'] == 'BANK_QR';
+    final formKey = GlobalKey<FormState>();
+    final expectedAmount = (detail['total'] as num).toDouble();
+    var amount = expectedAmount.toStringAsFixed(0);
+    var bankTransactionId = '';
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text(isQr ? 'Đối soát chuyển khoản QR' : 'Xác nhận đã thu COD'),
+        content: Form(
+          key: formKey,
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  isQr
+                      ? 'Chỉ xác nhận sau khi thấy giao dịch đúng số tiền và nội dung trên sao kê ngân hàng.'
+                      : 'Chỉ xác nhận sau khi đã giao hàng và thu đủ tiền mặt.',
+                ),
+                const SizedBox(height: 14),
+                TextFormField(
+                  initialValue: amount,
+                  keyboardType: TextInputType.number,
+                  decoration: const InputDecoration(
+                    labelText: 'Số tiền đã nhận (VNĐ)',
+                  ),
+                  onChanged: (value) => amount = value.trim(),
+                  validator: (value) =>
+                      double.tryParse(value?.trim() ?? '') == expectedAmount
+                      ? null
+                      : 'Số tiền phải khớp chính xác với đơn hàng',
+                ),
+                if (isQr) ...[
+                  const SizedBox(height: 12),
+                  TextFormField(
+                    decoration: const InputDecoration(
+                      labelText: 'Mã giao dịch trên sao kê',
+                    ),
+                    onChanged: (value) => bankTransactionId = value.trim(),
+                    validator: (value) => (value?.trim().length ?? 0) >= 6
+                        ? null
+                        : 'Nhập mã giao dịch ngân hàng',
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('Quay lại'),
+          ),
+          FilledButton(
+            onPressed: () {
+              if (formKey.currentState?.validate() == true) {
+                Navigator.pop(dialogContext, true);
+              }
+            },
+            child: const Text('Xác nhận đã nhận tiền'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    try {
+      await context.read<AppDependencies>().apiClient.postJson(
+        'api/admin/orders/${detail['orderId']}/payment/confirm',
+        {
+          'receivedAmount': double.parse(amount),
+          if (isQr) 'bankTransactionId': bankTransactionId,
+        },
+      );
+      await load();
+      if (mounted)
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Đã ghi nhận thanh toán sau đối soát.')),
+        );
+    } catch (error) {
+      if (mounted)
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text(_error(error))));
     }
   }
 
@@ -1662,12 +1852,15 @@ class _AdminOrdersScreenState extends State<AdminOrdersScreen> {
                                 Row(
                                   children: [
                                     Expanded(
-                                      child: Text(
-                                        'Đơn #${o['orderId']}',
-                                        style: const TextStyle(
-                                          fontSize: 16,
-                                          fontWeight: FontWeight.w800,
-                                          color: AdminPalette.ink,
+                                      child: Tooltip(
+                                        message: 'Mã đầy đủ: ${o['orderId']}',
+                                        child: Text(
+                                          'Đơn #${_compactOrderId(o['orderId'])}',
+                                          style: const TextStyle(
+                                            fontSize: 16,
+                                            fontWeight: FontWeight.w800,
+                                            color: AdminPalette.ink,
+                                          ),
                                         ),
                                       ),
                                     ),
@@ -1686,7 +1879,11 @@ class _AdminOrdersScreenState extends State<AdminOrdersScreen> {
                                     ),
                                     const SizedBox(width: 7),
                                     Text(
-                                      '${o['paymentMethod']}',
+                                      '${o['paymentMethod'] == 'BANK_QR'
+                                          ? 'QR chuyển khoản'
+                                          : o['paymentMethod'] == 'COD'
+                                          ? 'COD'
+                                          : o['paymentMethod']} · ${o['paymentStatus'] == 'SUCCESS' ? 'Đã thu' : 'Chờ tiền'}',
                                       style: const TextStyle(
                                         fontSize: 12,
                                         color: AdminPalette.secondary,
@@ -1744,7 +1941,7 @@ class AdminMoreScreen extends StatefulWidget {
 
 class _AdminMoreScreenState extends State<AdminMoreScreen>
     with SingleTickerProviderStateMixin {
-  late final TabController tabs = TabController(length: 3, vsync: this);
+  late final TabController tabs = TabController(length: 4, vsync: this);
   final Map<int, List<dynamic>> data = {};
   bool loading = true;
   String? error;
@@ -1907,7 +2104,7 @@ class _AdminMoreScreenState extends State<AdminMoreScreen>
                   alignment: Alignment.centerLeft,
                   child: AdminPageHeader(
                     title: 'Vận hành cửa hàng',
-                    subtitle: 'Danh mục, ưu đãi và điểm bán',
+                    subtitle: 'Danh mục, ưu đãi, điểm bán và đánh giá',
                   ),
                 ),
               ),
@@ -1936,6 +2133,7 @@ class _AdminMoreScreenState extends State<AdminMoreScreen>
                     Tab(text: 'Danh mục'),
                     Tab(text: 'Ưu đãi'),
                     Tab(text: 'Điểm bán'),
+                    Tab(text: 'Đánh giá'),
                   ],
                 ),
               ),
@@ -1943,7 +2141,8 @@ class _AdminMoreScreenState extends State<AdminMoreScreen>
               Expanded(
                 child: TabBarView(
                   controller: tabs,
-                  children: List.generate(3, (tab) {
+                  children: List.generate(4, (tab) {
+                    if (tab == 3) return const _AdminReviewsPanel();
                     final rows = data[tab] ?? [];
                     final label = switch (tab) {
                       0 => 'danh mục',
@@ -2091,6 +2290,262 @@ class _AdminMoreScreenState extends State<AdminMoreScreen>
   );
 }
 
+class _AdminReviewsPanel extends StatefulWidget {
+  const _AdminReviewsPanel();
+
+  @override
+  State<_AdminReviewsPanel> createState() => _AdminReviewsPanelState();
+}
+
+class _AdminReviewsPanelState extends State<_AdminReviewsPanel> {
+  int page = 1;
+  int total = 0;
+  bool loading = true;
+  String? error;
+  List<dynamic> reviews = const [];
+
+  @override
+  void initState() {
+    super.initState();
+    load();
+  }
+
+  Future<void> load() async {
+    setState(() {
+      loading = true;
+      error = null;
+    });
+    try {
+      final result = await context.read<AppDependencies>().apiClient.getJson(
+        'api/admin/reviews',
+        query: {'page': '$page', 'pageSize': '20'},
+      ) as Map<String, dynamic>;
+      if (!mounted) return;
+      setState(() {
+        reviews = result['items'] as List<dynamic>? ?? const [];
+        total = result['totalItems'] as int? ?? 0;
+      });
+    } catch (cause) {
+      if (mounted) setState(() => error = _error(cause));
+    } finally {
+      if (mounted) setState(() => loading = false);
+    }
+  }
+
+  Future<void> reply(Map<String, dynamic> review) async {
+    final initial = review['shopReply'] as String? ?? '';
+    var draft = initial;
+    final answer = await showDialog<String>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Phản hồi khách hàng'),
+        content: TextFormField(
+          initialValue: initial,
+          maxLines: 4,
+          maxLength: 600,
+          decoration: const InputDecoration(
+            hintText: 'Cảm ơn bạn đã chia sẻ…',
+            helperText: 'Để trống và lưu để gỡ phản hồi.',
+            helperMaxLines: 2,
+          ),
+          onChanged: (value) => draft = value,
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('Đóng'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(dialogContext, draft),
+            child: const Text('Lưu phản hồi'),
+          ),
+        ],
+      ),
+    );
+    if (answer == null || !mounted) return;
+    try {
+      await context.read<AppDependencies>().apiClient.putJson(
+        'api/admin/reviews/${review['reviewId']}/reply',
+        {'reply': answer.trim()},
+      );
+      await load();
+    } catch (cause) {
+      if (mounted)
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text(_error(cause))));
+    }
+  }
+
+  Future<void> setVisibility(Map<String, dynamic> review) async {
+    try {
+      await context.read<AppDependencies>().apiClient.putJson(
+        'api/admin/reviews/${review['reviewId']}/visibility',
+        {'isVisible': review['isVisible'] != true},
+      );
+      await load();
+    } catch (cause) {
+      if (mounted)
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text(_error(cause))));
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (loading && reviews.isEmpty) return const LoadingState();
+    if (error != null && reviews.isEmpty) {
+      return ErrorPanel(message: error!, onRetry: load);
+    }
+    return RefreshIndicator(
+      onRefresh: load,
+      child: ListView(
+        padding: const EdgeInsets.fromLTRB(18, 0, 18, 96),
+        children: [
+          Row(
+            children: [
+              Text(
+                '$total đánh giá từ đơn hàng',
+                style: const TextStyle(
+                  fontWeight: FontWeight.w800,
+                  color: AdminPalette.ink,
+                ),
+              ),
+              const Spacer(),
+              IconButton(
+                tooltip: 'Làm mới đánh giá',
+                onPressed: load,
+                icon: const Icon(Icons.refresh_rounded),
+              ),
+            ],
+          ),
+          if (reviews.isEmpty)
+            const AdminEmptyPanel(
+              title: 'Chưa có đánh giá',
+              message: 'Đánh giá của các đơn đã giao và thanh toán sẽ xuất hiện ở đây.',
+              icon: Icons.rate_review_outlined,
+            ),
+          for (final row in reviews) ...[
+            Builder(
+              builder: (context) {
+                final review = Map<String, dynamic>.from(row as Map);
+                final orderId = '${review['orderId']}';
+                final rating = review['rating'] as int? ?? 0;
+                return Padding(
+                  padding: const EdgeInsets.only(bottom: 10),
+                  child: AdminSurface(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                '${review['authorName']} · #${orderId.substring(0, orderId.length < 8 ? orderId.length : 8).toUpperCase()}',
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.w800,
+                                ),
+                              ),
+                            ),
+                            Text(
+                              '$rating/5 ★',
+                              style: const TextStyle(
+                                fontWeight: FontWeight.w800,
+                                color: Color(0xFFB67B20),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          review['comment'] as String? ??
+                              'Khách chỉ chấm điểm sao.',
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          review['sharePublicly'] == true
+                              ? review['isVisible'] == true
+                                    ? 'Được phép hiển thị công khai'
+                                    : 'Đã ẩn khỏi công khai'
+                              : 'Khách chọn đánh giá riêng tư',
+                          style: const TextStyle(
+                            color: AdminPalette.secondary,
+                            fontSize: 12,
+                          ),
+                        ),
+                        if ((review['shopReply'] as String?)?.isNotEmpty ==
+                            true) ...[
+                          const SizedBox(height: 8),
+                          Text(
+                            'PawMart: ${review['shopReply']}',
+                            style: const TextStyle(color: AdminPalette.forest),
+                          ),
+                        ],
+                        const SizedBox(height: 8),
+                        Wrap(
+                          spacing: 8,
+                          children: [
+                            TextButton.icon(
+                              onPressed: () => reply(review),
+                              icon: const Icon(Icons.reply_rounded, size: 18),
+                              label: Text(
+                                review['shopReply'] == null
+                                    ? 'Phản hồi'
+                                    : 'Sửa phản hồi',
+                              ),
+                            ),
+                            if (review['sharePublicly'] == true)
+                              TextButton.icon(
+                                onPressed: () => setVisibility(review),
+                                icon: Icon(
+                                  review['isVisible'] == true
+                                      ? Icons.visibility_off_outlined
+                                      : Icons.visibility_outlined,
+                                  size: 18,
+                                ),
+                                label: Text(
+                                  review['isVisible'] == true ? 'Ẩn' : 'Hiện',
+                                ),
+                              ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              },
+            ),
+          ],
+          if (total > 20)
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                TextButton(
+                  onPressed: page <= 1
+                      ? null
+                      : () {
+                          setState(() => page--);
+                          load();
+                        },
+                  child: const Text('Trang trước'),
+                ),
+                Text('Trang $page'),
+                TextButton(
+                  onPressed: page * 20 >= total
+                      ? null
+                      : () {
+                          setState(() => page++);
+                          load();
+                        },
+                  child: const Text('Trang sau'),
+                ),
+              ],
+            ),
+        ],
+      ),
+    );
+  }
+}
+
 class _AdminOrderDetails extends StatelessWidget {
   const _AdminOrderDetails({required this.detail});
   final Map<String, dynamic> detail;
@@ -2106,13 +2561,32 @@ class _AdminOrderDetails extends StatelessWidget {
             child: ListView(
               padding: const EdgeInsets.fromLTRB(18, 0, 18, 18),
               children: [
-                Text(
-                  'Đơn #${detail['orderId']}',
-                  style: const TextStyle(
-                    fontSize: 24,
-                    fontWeight: FontWeight.w800,
-                    color: AdminPalette.ink,
-                  ),
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        'Đơn #${_compactOrderId(detail['orderId'])}',
+                        style: const TextStyle(
+                          fontSize: 24,
+                          fontWeight: FontWeight.w800,
+                          color: AdminPalette.ink,
+                        ),
+                      ),
+                    ),
+                    IconButton(
+                      tooltip: 'Sao chép mã đơn đầy đủ',
+                      onPressed: () async {
+                        await Clipboard.setData(
+                          ClipboardData(text: '${detail['orderId']}'),
+                        );
+                        if (!context.mounted) return;
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('Đã sao chép mã đơn')),
+                        );
+                      },
+                      icon: const Icon(Icons.copy_outlined, size: 20),
+                    ),
+                  ],
                 ),
                 const SizedBox(height: 10),
                 AdminStatusPill('${detail['status']}'),
@@ -2159,12 +2633,20 @@ class _AdminOrderDetails extends StatelessWidget {
                       const SizedBox(width: 10),
                       Expanded(
                         child: Text(
-                          '${detail['paymentMethod']}',
+                          detail['paymentMethod'] == 'BANK_QR'
+                              ? 'Chuyển khoản QR'
+                              : detail['paymentMethod'] == 'COD'
+                              ? 'Thu tiền khi giao'
+                              : '${detail['paymentMethod']}',
                           style: const TextStyle(fontWeight: FontWeight.w700),
                         ),
                       ),
                       Text(
-                        '${detail['paymentStatus']}',
+                        detail['paymentStatus'] == 'SUCCESS'
+                            ? 'Đã nhận tiền'
+                            : detail['paymentStatus'] == 'PENDING'
+                            ? 'Chờ thanh toán'
+                            : '${detail['paymentStatus']}',
                         style: const TextStyle(
                           fontSize: 12,
                           color: AdminPalette.secondary,
@@ -2227,12 +2709,41 @@ class _AdminOrderDetails extends StatelessWidget {
               ],
             ),
           ),
-          if (['PENDING', 'CONFIRMED', 'SHIPPING'].contains(detail['status']))
+          if (['PENDING', 'CONFIRMED', 'SHIPPING'].contains(detail['status']) ||
+              (detail['paymentStatus'] == 'PENDING' &&
+                  detail['status'] != 'CANCELLED' &&
+                  (detail['paymentMethod'] == 'BANK_QR' ||
+                      (detail['paymentMethod'] == 'COD' &&
+                          detail['status'] == 'DELIVERED'))))
             Padding(
               padding: const EdgeInsets.fromLTRB(18, 10, 18, 18),
-              child: FilledButton(
-                onPressed: () => Navigator.pop(context, true),
-                child: const Text('Cập nhật trạng thái'),
+              child: Row(
+                children: [
+                  if ([
+                    'PENDING',
+                    'CONFIRMED',
+                    'SHIPPING',
+                  ].contains(detail['status']))
+                    Expanded(
+                      child: OutlinedButton(
+                        onPressed: () => Navigator.pop(context, 'STATUS'),
+                        child: const Text('Trạng thái đơn'),
+                      ),
+                    ),
+                  if (detail['paymentStatus'] == 'PENDING' &&
+                      detail['status'] != 'CANCELLED' &&
+                      (detail['paymentMethod'] == 'BANK_QR' ||
+                          (detail['paymentMethod'] == 'COD' &&
+                              detail['status'] == 'DELIVERED'))) ...[
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: FilledButton(
+                        onPressed: () => Navigator.pop(context, 'PAYMENT'),
+                        child: const Text('Xác nhận tiền'),
+                      ),
+                    ),
+                  ],
+                ],
               ),
             ),
         ],

@@ -41,6 +41,17 @@ class OrdersRepository {
         }) as Map<String, dynamic>,
       );
 
+  Future<PaymentMethods> paymentMethods() async => PaymentMethods.fromJson(
+    await _apiClient.getJson('api/cart/checkout/payment-methods')
+        as Map<String, dynamic>,
+  );
+
+  Future<BankQrInstructions> bankQr(String orderId) async =>
+      BankQrInstructions.fromJson(
+        await _apiClient.getJson('api/orders/$orderId/payment/qr')
+            as Map<String, dynamic>,
+      );
+
   Future<OrderSummary> checkout({
     required String recipientName,
     required String recipientPhone,
@@ -68,4 +79,22 @@ class OrdersRepository {
 
   Future<void> cancel(String orderId) async =>
       _apiClient.postJson('api/orders/$orderId/cancel');
+
+  Future<OrderReview> submitReview(
+    String orderId, {
+    required int rating,
+    String? comment,
+    bool sharePublicly = false,
+  }) async => OrderReview.fromJson(
+    await _apiClient.postJson('api/orders/$orderId/review', {
+      'rating': rating,
+      'comment': comment,
+      'sharePublicly': sharePublicly,
+    }) as Map<String, dynamic>,
+  );
+
+  Future<PublicOrderReviews> publicReviews() async =>
+      PublicOrderReviews.fromJson(
+        await _apiClient.getJson('api/reviews') as Map<String, dynamic>,
+      );
 }

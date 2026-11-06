@@ -14,7 +14,7 @@ class CatalogViewModel extends ChangeNotifier {
   List<Category> categories = const [];
   String search = '';
   String petType = 'ALL';
-  String sort = 'newest';
+  String sort = 'recommended';
   int? categoryId;
   int totalItems = 0;
   int _page = 0;

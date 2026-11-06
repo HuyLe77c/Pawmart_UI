@@ -38,8 +38,11 @@ class OrderDetailViewModel extends ChangeNotifier {
   final String orderId;
 
   OrderDetail? order;
+  BankQrInstructions? bankQr;
+  String? bankQrError;
   bool isLoading = false;
   bool isCancelling = false;
+  bool isSubmittingReview = false;
   String? errorMessage;
 
   Future<void> load() async {
@@ -48,6 +51,17 @@ class OrderDetailViewModel extends ChangeNotifier {
     notifyListeners();
     try {
       order = await _repository.detail(orderId);
+      bankQr = null;
+      bankQrError = null;
+      if (order!.paymentMethod == 'BANK_QR' && order!.status != 'CANCELLED') {
+        try {
+          bankQr = await _repository.bankQr(orderId);
+        } on ApiException catch (error) {
+          bankQrError = error.userMessage;
+        } catch (_) {
+          bankQrError = 'Không tải được mã QR. Kéo xuống để thử lại.';
+        }
+      }
     } on ApiException catch (error) {
       errorMessage = error.userMessage;
     } catch (_) {
@@ -72,6 +86,35 @@ class OrderDetailViewModel extends ChangeNotifier {
       errorMessage = 'Không thể hủy đơn hàng.';
     } finally {
       isCancelling = false;
+      notifyListeners();
+    }
+    return false;
+  }
+
+  Future<bool> submitReview({
+    required int rating,
+    required String comment,
+    required bool sharePublicly,
+  }) async {
+    if (isSubmittingReview) return false;
+    isSubmittingReview = true;
+    errorMessage = null;
+    notifyListeners();
+    try {
+      await _repository.submitReview(
+        orderId,
+        rating: rating,
+        comment: comment.trim(),
+        sharePublicly: sharePublicly,
+      );
+      await load();
+      return true;
+    } on ApiException catch (error) {
+      errorMessage = error.userMessage;
+    } catch (_) {
+      errorMessage = 'Không gửi được đánh giá. Vui lòng thử lại.';
+    } finally {
+      isSubmittingReview = false;
       notifyListeners();
     }
     return false;

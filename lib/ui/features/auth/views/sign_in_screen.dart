@@ -35,9 +35,10 @@ class _SignInScreenState extends State<SignInScreen> {
   @override
   Widget build(BuildContext context) => Scaffold(
     body: SafeArea(
-      child: Center(
+      child: Align(
+        alignment: Alignment.topCenter,
         child: SingleChildScrollView(
-          padding: const EdgeInsets.fromLTRB(24, 28, 24, 24),
+          padding: const EdgeInsets.fromLTRB(24, 64, 24, 24),
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 440),
             child: Consumer<AuthViewModel>(
@@ -47,7 +48,7 @@ class _SignInScreenState extends State<SignInScreen> {
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     const _BrandMark(),
-                    const SizedBox(height: 38),
+                    const SizedBox(height: 32),
                     Text(
                       'Chào mừng trở lại.',
                       style: Theme.of(context).textTheme.headlineMedium

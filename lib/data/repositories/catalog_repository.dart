@@ -12,7 +12,7 @@ class CatalogRepository {
     String? search,
     int? categoryId,
     String? petType,
-    String sort = 'newest',
+    String sort = 'recommended',
     int page = 1,
     int pageSize = 20,
   }) async {

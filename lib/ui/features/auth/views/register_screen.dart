@@ -44,7 +44,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
   Widget build(BuildContext context) => Scaffold(
     appBar: AppBar(leading: const BackButton()),
     body: SafeArea(
-      child: Center(
+      child: Align(
+        alignment: Alignment.topCenter,
         child: SingleChildScrollView(
           padding: const EdgeInsets.fromLTRB(24, 12, 24, 24),
           child: ConstrainedBox(

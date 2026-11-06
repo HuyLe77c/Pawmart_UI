@@ -16,10 +16,16 @@ import '../../../core/widgets/product_card.dart';
 import '../view_models/catalog_view_model.dart';
 
 class CatalogScreen extends StatelessWidget {
-  const CatalogScreen({super.key, this.initialSearch, this.initialCategoryId});
+  const CatalogScreen({
+    super.key,
+    this.initialSearch,
+    this.initialCategoryId,
+    this.initialPetType,
+  });
 
   final String? initialSearch;
   final int? initialCategoryId;
+  final String? initialPetType;
 
   @override
   Widget build(BuildContext context) => ChangeNotifierProvider(
@@ -29,6 +35,9 @@ class CatalogScreen extends StatelessWidget {
       );
       viewModel.search = initialSearch ?? '';
       viewModel.categoryId = initialCategoryId;
+      if (initialPetType == 'DOG' || initialPetType == 'CAT') {
+        viewModel.petType = initialPetType!;
+      }
       viewModel.load();
       return viewModel;
     },
@@ -73,6 +82,7 @@ class _CatalogContentState extends State<_CatalogContent> {
 
   void _showSort(CatalogViewModel model) {
     const options = [
+      ('recommended', 'Khám phá', Icons.grid_view_rounded),
       ('newest', 'Mới nhất', Icons.schedule_rounded),
       ('price_asc', 'Giá thấp trước', Icons.south_rounded),
       ('price_desc', 'Giá cao trước', Icons.north_rounded),
@@ -117,15 +127,16 @@ class _CatalogContentState extends State<_CatalogContent> {
   }
 
   Future<void> _quickAdd(Product product) async {
-    if (_addingId != null) return;
+    if (_addingId != null || !product.canPurchase) return;
     setState(() => _addingId = product.productId);
     final added = await addProductToCart(context, productId: product.productId);
     if (mounted) {
       setState(() => _addingId = null);
-      if (added)
+      if (added) {
         ScaffoldMessenger.of(
           context,
         ).showSnackBar(const SnackBar(content: Text('Đã thêm vào giỏ hàng.')));
+      }
     }
   }
 
@@ -262,6 +273,14 @@ class _CatalogContentState extends State<_CatalogContent> {
                       },
                     ),
                   ),
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: TextButton.icon(
+                      onPressed: () => context.push('/stores'),
+                      icon: const Icon(Icons.location_on_outlined, size: 18),
+                      label: const Text('Xem địa chỉ cửa hàng trên bản đồ'),
+                    ),
+                  ),
                 ],
               ),
             ),
@@ -307,6 +326,7 @@ class _CatalogContentState extends State<_CatalogContent> {
                   onPressed: () => _showSort(model),
                   icon: const Icon(Icons.tune_rounded, size: 17),
                   label: Text(switch (model.sort) {
+                    'recommended' => 'Khám phá',
                     'price_asc' => 'Giá thấp',
                     'price_desc' => 'Giá cao',
                     'name' => 'Tên A–Z',
@@ -346,8 +366,9 @@ class _CatalogContentState extends State<_CatalogContent> {
                     child: NotificationListener<ScrollNotification>(
                       onNotification: (notification) {
                         if (notification.metrics.pixels >=
-                            notification.metrics.maxScrollExtent - 240)
+                            notification.metrics.maxScrollExtent - 240) {
                           model.loadMore();
+                        }
                         return false;
                       },
                       child: CustomScrollView(

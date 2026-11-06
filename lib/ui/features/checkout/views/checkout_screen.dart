@@ -1,12 +1,13 @@
 import 'package:flutter/material.dart';
-import 'package:geolocator/geolocator.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
 import '../../../core/app_dependencies.dart';
 import '../../../core/app_theme.dart';
 import '../../../core/formatters.dart';
+import '../../auth/view_models/auth_view_model.dart';
 import '../view_models/checkout_view_model.dart';
+import '../../maps/delivery_address_map_screen.dart';
 
 class CheckoutScreen extends StatelessWidget {
   const CheckoutScreen({super.key});
@@ -15,7 +16,8 @@ class CheckoutScreen extends StatelessWidget {
   Widget build(BuildContext context) => ChangeNotifierProvider(
     create: (context) =>
         CheckoutViewModel(context.read<AppDependencies>().ordersRepository)
-          ..loadQuote(),
+          ..loadQuote()
+          ..loadPaymentMethods(),
     child: const _CheckoutBody(),
   );
 }
@@ -34,10 +36,16 @@ class _CheckoutBodyState extends State<_CheckoutBody> {
   final _address = TextEditingController();
   final _note = TextEditingController();
   final _promo = TextEditingController();
-  final _lat = TextEditingController();
-  final _lon = TextEditingController();
-  bool _locating = false;
-  String? _locationMessage;
+  double? _latitude;
+  double? _longitude;
+
+  @override
+  void initState() {
+    super.initState();
+    final user = context.read<AuthViewModel>().user;
+    _name.text = user?.fullName ?? '';
+    _phone.text = user?.phoneNumber ?? '';
+  }
 
   @override
   void dispose() {
@@ -46,80 +54,42 @@ class _CheckoutBodyState extends State<_CheckoutBody> {
     _address.dispose();
     _note.dispose();
     _promo.dispose();
-    _lat.dispose();
-    _lon.dispose();
     super.dispose();
   }
 
-  Future<void> _locate() async {
+  Future<void> _chooseOnMap() async {
+    final place = await context.push<DeliveryPlace>(
+      '/delivery-map',
+      extra: DeliveryMapInput(
+        address: _address.text.trim(),
+        latitude: _latitude,
+        longitude: _longitude,
+      ),
+    );
+    if (place == null || !mounted) return;
+    _address.text = place.address;
     setState(() {
-      _locating = true;
-      _locationMessage = null;
+      _latitude = place.latitude;
+      _longitude = place.longitude;
     });
-    try {
-      if (!await Geolocator.isLocationServiceEnabled())
-        throw Exception(
-          'Dịch vụ vị trí đang tắt. Bạn vẫn có thể nhập địa chỉ thủ công.',
-        );
-      var permission = await Geolocator.checkPermission();
-      if (permission == LocationPermission.denied)
-        permission = await Geolocator.requestPermission();
-      if (permission == LocationPermission.denied ||
-          permission == LocationPermission.deniedForever)
-        throw Exception(
-          'Chưa có quyền vị trí. Bạn vẫn có thể nhập địa chỉ thủ công.',
-        );
-      final position = await Geolocator.getCurrentPosition(
-        locationSettings: const LocationSettings(
-          accuracy: LocationAccuracy.high,
-          timeLimit: Duration(seconds: 12),
-        ),
-      );
-      _lat.text = position.latitude.toStringAsFixed(6);
-      _lon.text = position.longitude.toStringAsFixed(6);
-      if (mounted)
-        setState(
-          () => _locationMessage =
-              'Đã lấy tọa độ GPS. Vui lòng nhập địa chỉ giao hàng cụ thể.',
-        );
-    } catch (error) {
-      if (mounted)
-        setState(
-          () => _locationMessage = error.toString().replaceFirst(
-            'Exception: ',
-            '',
-          ),
-        );
-    } finally {
-      if (mounted) setState(() => _locating = false);
-    }
   }
 
   Future<void> _submit(CheckoutViewModel model) async {
     if (!_formKey.currentState!.validate()) return;
-    final lat = double.tryParse(_lat.text.trim());
-    final lon = double.tryParse(_lon.text.trim());
-    if ((lat == null) != (lon == null)) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-            'Hãy nhập đủ cả vĩ độ và kinh độ, hoặc để trống cả hai.',
-          ),
-        ),
-      );
-      return;
-    }
     final order = await model.submit(
       recipientName: _name.text.trim(),
-      recipientPhone: _phone.text.trim(),
+      recipientPhone: _phone.text.replaceAll(RegExp(r'[\s.-]'), ''),
       address: _address.text.trim(),
-      latitude: lat,
-      longitude: lon,
+      latitude: _latitude,
+      longitude: _longitude,
       promotionCode: _promo.text.trim(),
       note: _note.text.trim(),
     );
-    if (order != null && mounted)
-      context.go('/customer/orders/${Uri.encodeComponent(order.orderId)}');
+    if (order != null && mounted) {
+      context.go(
+        '/customer/orders/${Uri.encodeComponent(order.orderId)}?placed=1',
+      );
+    }
   }
 
   @override
@@ -132,7 +102,7 @@ class _CheckoutBodyState extends State<_CheckoutBody> {
           padding: const EdgeInsets.fromLTRB(20, 20, 20, 32),
           children: [
             const Text(
-              'Kiểm tra thông tin để hoàn tất đơn hàng.',
+              'Kiểm tra người nhận, cách thanh toán và tổng tiền trước khi đặt.',
               style: TextStyle(color: PawmartColors.muted),
             ),
             const SizedBox(height: 22),
@@ -141,6 +111,7 @@ class _CheckoutBodyState extends State<_CheckoutBody> {
             TextFormField(
               controller: _name,
               decoration: const InputDecoration(labelText: 'Họ tên người nhận'),
+              autofillHints: const [AutofillHints.name],
               textInputAction: TextInputAction.next,
               validator: (v) =>
                   (v?.trim().length ?? 0) < 2 ? 'Nhập họ tên hợp lệ' : null,
@@ -149,17 +120,33 @@ class _CheckoutBodyState extends State<_CheckoutBody> {
             TextFormField(
               controller: _phone,
               keyboardType: TextInputType.phone,
-              decoration: const InputDecoration(labelText: 'Số điện thoại'),
+              autofillHints: const [AutofillHints.telephoneNumber],
+              decoration: const InputDecoration(
+                labelText: 'Số điện thoại',
+                hintText: '0xxxxxxxxx hoặc +84xxxxxxxxx',
+              ),
               textInputAction: TextInputAction.next,
-              validator: (v) => (v?.trim().length ?? 0) < 7
-                  ? 'Nhập số điện thoại hợp lệ'
-                  : null,
+              validator: (value) {
+                final phone = value?.replaceAll(RegExp(r'[\s.-]'), '') ?? '';
+                return RegExp(r'^(0[0-9]{9}|\+84[0-9]{9})$').hasMatch(phone)
+                    ? null
+                    : 'Nhập số điện thoại Việt Nam hợp lệ';
+              },
             ),
             const SizedBox(height: 12),
             TextFormField(
               controller: _address,
+              onChanged: (_) {
+                if (_latitude != null) {
+                  setState(() {
+                    _latitude = null;
+                    _longitude = null;
+                  });
+                }
+              },
               minLines: 2,
               maxLines: 3,
+              autofillHints: const [AutofillHints.streetAddressLine1],
               decoration: const InputDecoration(
                 labelText: 'Địa chỉ chi tiết',
                 alignLabelWithHint: true,
@@ -168,69 +155,85 @@ class _CheckoutBodyState extends State<_CheckoutBody> {
                   ? 'Địa chỉ cần ít nhất 5 ký tự'
                   : null,
             ),
-            const SizedBox(height: 8),
-            ExpansionTile(
-              tilePadding: EdgeInsets.zero,
-              title: const Text('Thêm vị trí giao hàng'),
-              subtitle: const Text('Tùy chọn nếu địa chỉ khó tìm'),
-              leading: const Icon(Icons.location_on_outlined),
-              children: [
-                Align(
-                  alignment: Alignment.centerLeft,
-                  child: OutlinedButton.icon(
-                    onPressed: _locating ? null : _locate,
-                    icon: _locating
-                        ? const SizedBox(
-                            width: 18,
-                            height: 18,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          )
-                        : const Icon(Icons.my_location),
-                    label: const Text('Dùng vị trí hiện tại'),
+            const SizedBox(height: 10),
+            Material(
+              color: PawmartColors.greenPale,
+              borderRadius: BorderRadius.circular(16),
+              child: InkWell(
+                borderRadius: BorderRadius.circular(16),
+                onTap: _chooseOnMap,
+                child: Padding(
+                  padding: const EdgeInsets.all(15),
+                  child: Row(
+                    children: [
+                      const Icon(
+                        Icons.map_outlined,
+                        color: PawmartColors.green,
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              'Chọn trên bản đồ',
+                              style: TextStyle(fontWeight: FontWeight.w800),
+                            ),
+                            Text(
+                              _latitude == null
+                                  ? 'Tìm địa chỉ, lấy GPS hoặc chạm chọn điểm giao'
+                                  : 'Đã lưu ghim giao hàng · Chạm để chỉnh lại',
+                              style: const TextStyle(
+                                fontSize: 12,
+                                color: PawmartColors.muted,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const Icon(
+                        Icons.arrow_forward_ios_rounded,
+                        size: 16,
+                        color: PawmartColors.green,
+                      ),
+                    ],
                   ),
                 ),
-                if (_locationMessage != null)
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: 8),
-                    child: Text(_locationMessage!),
-                  ),
-                Row(
-                  children: [
-                    Expanded(
-                      child: TextFormField(
-                        controller: _lat,
-                        keyboardType: const TextInputType.numberWithOptions(
-                          decimal: true,
-                          signed: true,
-                        ),
-                        decoration: const InputDecoration(labelText: 'Vĩ độ'),
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: TextFormField(
-                        controller: _lon,
-                        keyboardType: const TextInputType.numberWithOptions(
-                          decimal: true,
-                          signed: true,
-                        ),
-                        decoration: const InputDecoration(labelText: 'Kinh độ'),
-                      ),
-                    ),
-                  ],
-                ),
-              ],
+              ),
             ),
             const SizedBox(height: 24),
             const _CheckoutSectionTitle('02', 'Thanh toán'),
             const SizedBox(height: 12),
-            Card(
-              child: const ListTile(
-                leading: Icon(Icons.payments_outlined),
-                title: Text('Thanh toán khi nhận hàng (COD)'),
-                subtitle: Text('Đang khả dụng'),
-              ),
+            _PaymentChoice(
+              icon: Icons.payments_outlined,
+              title: 'Thanh toán khi nhận hàng',
+              subtitle: 'Trả tiền mặt sau khi nhận và kiểm tra hàng',
+              selected: model.selectedPaymentMethod == 'COD',
+              enabled: !model.isSubmitting,
+              onTap: () => model.selectPaymentMethod('COD'),
             ),
+            const SizedBox(height: 10),
+            _PaymentChoice(
+              icon: Icons.qr_code_2_rounded,
+              title: 'Chuyển khoản bằng mã QR',
+              subtitle: model.paymentMethods?.bankQrAvailable == true
+                  ? 'Tạo QR theo đúng số tiền và mã của đơn hàng'
+                  : model.isLoadingPaymentMethods
+                  ? 'Đang kiểm tra phương thức thanh toán…'
+                  : 'Tạm thời chưa khả dụng',
+              selected: model.selectedPaymentMethod == 'BANK_QR',
+              enabled:
+                  model.paymentMethods?.bankQrAvailable == true &&
+                  !model.isSubmitting,
+              onTap: () => model.selectPaymentMethod('BANK_QR'),
+            ),
+            if (model.selectedPaymentMethod == 'BANK_QR') ...[
+              const SizedBox(height: 8),
+              const Text(
+                'Sau khi đặt hàng, mã QR sẽ xuất hiện trong chi tiết đơn. Cửa hàng chỉ xác nhận thanh toán sau khi đối soát giao dịch ngân hàng.',
+                style: TextStyle(color: PawmartColors.muted, fontSize: 12),
+              ),
+            ],
             const SizedBox(height: 12),
             TextFormField(
               controller: _promo,
@@ -350,7 +353,7 @@ class _CheckoutBodyState extends State<_CheckoutBody> {
               label: Text(
                 model.isSubmitting
                     ? 'Đang đặt hàng…'
-                    : 'Đặt hàng · ${model.quote == null ? '—' : formatVnd(model.quote!.total)}',
+                    : '${model.selectedPaymentMethod == 'BANK_QR' ? 'Tạo đơn và lấy mã QR' : 'Đặt hàng'} · ${model.quote == null ? '—' : formatVnd(model.quote!.total)}',
               ),
             ),
           ],
@@ -389,6 +392,78 @@ class _CheckoutSectionTitle extends StatelessWidget {
       const SizedBox(width: 10),
       Text(title, style: Theme.of(context).textTheme.titleLarge),
     ],
+  );
+}
+
+class _PaymentChoice extends StatelessWidget {
+  const _PaymentChoice({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.selected,
+    required this.enabled,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final bool selected;
+  final bool enabled;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) => AnimatedContainer(
+    duration: const Duration(milliseconds: 180),
+    decoration: BoxDecoration(
+      color: selected ? PawmartColors.greenPale : Colors.white,
+      borderRadius: BorderRadius.circular(16),
+      border: Border.all(
+        color: selected ? PawmartColors.green : PawmartColors.line,
+        width: selected ? 1.5 : 1,
+      ),
+    ),
+    child: InkWell(
+      borderRadius: BorderRadius.circular(16),
+      onTap: enabled ? onTap : null,
+      child: Padding(
+        padding: const EdgeInsets.all(15),
+        child: Row(
+          children: [
+            Icon(
+              icon,
+              color: enabled ? PawmartColors.greenDark : PawmartColors.muted,
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: const TextStyle(fontWeight: FontWeight.w800),
+                  ),
+                  const SizedBox(height: 3),
+                  Text(
+                    subtitle,
+                    style: const TextStyle(
+                      color: PawmartColors.muted,
+                      fontSize: 12,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Icon(
+              selected
+                  ? Icons.check_circle_rounded
+                  : Icons.radio_button_unchecked,
+              color: selected ? PawmartColors.green : PawmartColors.muted,
+            ),
+          ],
+        ),
+      ),
+    ),
   );
 }
 

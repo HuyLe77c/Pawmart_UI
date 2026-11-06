@@ -173,6 +173,32 @@ class _OrderCard extends StatelessWidget {
                 const Icon(Icons.chevron_right, color: PawmartColors.muted),
               ],
             ),
+            if (order.reviewRating != null ||
+                (order.status == 'DELIVERED' &&
+                    order.paymentStatus == 'SUCCESS')) ...[
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  Icon(
+                    order.reviewRating == null
+                        ? Icons.rate_review_outlined
+                        : Icons.star_rounded,
+                    size: 17,
+                    color: const Color(0xFFE7A33B),
+                  ),
+                  const SizedBox(width: 6),
+                  Text(
+                    order.reviewRating == null
+                        ? 'Chạm để đánh giá đơn'
+                        : 'Đã đánh giá ${order.reviewRating}/5',
+                    style: const TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ],
+              ),
+            ],
           ],
         ),
       ),
@@ -181,6 +207,8 @@ class _OrderCard extends StatelessWidget {
 
   static String _payment(String value) => value == 'COD'
       ? 'Thanh toán khi nhận hàng'
+      : value == 'BANK_QR'
+      ? 'Chuyển khoản QR'
       : 'Thanh toán ${value.toUpperCase()}';
 }
 

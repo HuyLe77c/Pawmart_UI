@@ -12,9 +12,36 @@ class CheckoutViewModel extends ChangeNotifier {
   String? errorMessage;
   OrderSummary? createdOrder;
   CheckoutQuote? quote;
+  PaymentMethods? paymentMethods;
+  String selectedPaymentMethod = 'COD';
+  bool isLoadingPaymentMethods = false;
   bool isLoadingQuote = false;
   String? quoteError;
   int _quoteVersion = 0;
+
+  Future<void> loadPaymentMethods() async {
+    isLoadingPaymentMethods = true;
+    notifyListeners();
+    try {
+      paymentMethods = await _repository.paymentMethods();
+    } catch (_) {
+      paymentMethods = const PaymentMethods(
+        codAvailable: true,
+        bankQrAvailable: false,
+      );
+    } finally {
+      isLoadingPaymentMethods = false;
+      notifyListeners();
+    }
+  }
+
+  void selectPaymentMethod(String method) {
+    if (isSubmitting || method == selectedPaymentMethod) return;
+    if (method == 'BANK_QR' && paymentMethods?.bankQrAvailable != true) return;
+    selectedPaymentMethod = method;
+    errorMessage = null;
+    notifyListeners();
+  }
 
   void invalidateQuote() {
     _quoteVersion++;
@@ -63,6 +90,12 @@ class CheckoutViewModel extends ChangeNotifier {
       notifyListeners();
       return null;
     }
+    if (selectedPaymentMethod == 'BANK_QR' &&
+        paymentMethods?.bankQrAvailable != true) {
+      errorMessage = 'QR chuyển khoản chưa sẵn sàng. Hãy chọn COD.';
+      notifyListeners();
+      return null;
+    }
     isSubmitting = true;
     errorMessage = null;
     notifyListeners();
@@ -73,7 +106,7 @@ class CheckoutViewModel extends ChangeNotifier {
         shippingAddress: address,
         latitude: latitude,
         longitude: longitude,
-        paymentMethod: 'COD',
+        paymentMethod: selectedPaymentMethod,
         promotionCode: promotionCode,
         expectedQuoteFingerprint: reviewedQuote.fingerprint,
         note: note,
@@ -81,7 +114,7 @@ class CheckoutViewModel extends ChangeNotifier {
       return createdOrder;
     } on ApiException catch (error) {
       errorMessage = _checkoutMessage(error);
-      if (error.statusCode == 409) {
+      if (error.title == 'Checkout quote changed') {
         await loadQuote(promotionCode: promotionCode);
         errorMessage = quote == null ? quoteError : 'Giỏ hàng, giá hoặc ưu đãi đã thay đổi. Vui lòng xem lại tổng tiền mới trước khi đặt.';
       }

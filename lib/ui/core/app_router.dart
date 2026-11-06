@@ -18,6 +18,8 @@ import '../features/orders/views/order_detail_screen.dart';
 import '../features/admin/views/admin_shell.dart';
 import '../features/admin/views/admin_screens.dart';
 import '../features/notifications/views/notifications_screen.dart';
+import '../features/maps/store_location_screen.dart';
+import '../features/maps/delivery_address_map_screen.dart';
 
 GoRouter createAppRouter(AuthViewModel auth) => GoRouter(
   initialLocation: '/',
@@ -25,7 +27,10 @@ GoRouter createAppRouter(AuthViewModel auth) => GoRouter(
   redirect: (context, state) {
     final path = state.uri.path;
     final isAuthPage = path == '/sign-in' || path == '/register';
-    final isPublicPage = path == '/catalog' || path.startsWith('/products/');
+    final isPublicPage =
+        path == '/catalog' ||
+        path == '/stores' ||
+        path.startsWith('/products/');
 
     if (auth.status == AuthStatus.initializing) return null;
     if (!auth.isSignedIn) {
@@ -76,6 +81,21 @@ GoRouter createAppRouter(AuthViewModel auth) => GoRouter(
       ),
     ),
     GoRoute(
+      path: '/stores',
+      builder: (context, state) => const StoreLocationScreen(),
+    ),
+    GoRoute(
+      path: '/delivery-map',
+      builder: (context, state) {
+        final input = state.extra as DeliveryMapInput?;
+        return DeliveryAddressMapScreen(
+          address: input?.address ?? '',
+          latitude: input?.latitude,
+          longitude: input?.longitude,
+        );
+      },
+    ),
+    GoRoute(
       path: '/products/:id',
       builder: (context, state) => ProductDetailScreen(
         productId: int.tryParse(state.pathParameters['id'] ?? '') ?? 0,
@@ -93,6 +113,7 @@ GoRouter createAppRouter(AuthViewModel auth) => GoRouter(
           path: '/customer/categories',
           builder: (context, state) => CatalogScreen(
             initialSearch: state.uri.queryParameters['search'],
+            initialPetType: state.uri.queryParameters['petType'],
             initialCategoryId: int.tryParse(
               state.uri.queryParameters['categoryId'] ?? '',
             ),
@@ -112,8 +133,10 @@ GoRouter createAppRouter(AuthViewModel auth) => GoRouter(
         ),
         GoRoute(
           path: '/customer/orders/:orderId',
-          builder: (context, state) =>
-              OrderDetailScreen(orderId: state.pathParameters['orderId']!),
+          builder: (context, state) => OrderDetailScreen(
+            orderId: state.pathParameters['orderId']!,
+            justPlaced: state.uri.queryParameters['placed'] == '1',
+          ),
         ),
         GoRoute(
           path: '/customer/profile',

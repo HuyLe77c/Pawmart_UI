@@ -4,6 +4,7 @@ import '../../../domain/models/product.dart';
 import '../app_theme.dart';
 import '../formatters.dart';
 import 'product_artwork.dart';
+import 'product_review_panel.dart';
 
 class ProductCard extends StatelessWidget {
   const ProductCard({
@@ -36,12 +37,23 @@ class ProductCard extends StatelessWidget {
               children: [
                 ColoredBox(
                   color: const Color(0xFFF2F5F0),
-                  child: ProductArtwork(
-                    imageUrl: product.primaryImageUrl,
-                    height: 128,
-                  ),
+                  child: product.hasVerifiedImage
+                      ? ProductArtwork(
+                          imageUrl: product.primaryImageUrl,
+                          height: 128,
+                        )
+                      : ProductReviewPanel(product: product, height: 128),
                 ),
-                if (product.stockQuantity <= 0)
+                if (product.isPreview)
+                  const Positioned(
+                    left: 10,
+                    top: 10,
+                    child: _ProductBadge(
+                      text: 'Sắp mở bán',
+                      color: PawmartColors.greenDark,
+                    ),
+                  )
+                else if (product.stockQuantity <= 0)
                   const Positioned(
                     left: 10,
                     top: 10,
@@ -59,33 +71,35 @@ class ProductCard extends StatelessWidget {
                       color: PawmartColors.amber,
                     ),
                   ),
-                Positioned(
-                  right: 10,
-                  bottom: 10,
-                  child: IconButton.filled(
-                    tooltip: 'Thêm vào giỏ',
-                    style: IconButton.styleFrom(
-                      backgroundColor: PawmartColors.green,
-                      foregroundColor: Colors.white,
-                      minimumSize: const Size(44, 44),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(14),
+                if (!product.isPreview)
+                  Positioned(
+                    right: 10,
+                    bottom: 10,
+                    child: IconButton.filled(
+                      tooltip: 'Thêm vào giỏ',
+                      style: IconButton.styleFrom(
+                        backgroundColor: PawmartColors.green,
+                        foregroundColor: Colors.white,
+                        minimumSize: const Size(44, 44),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(14),
+                        ),
                       ),
-                    ),
-                    onPressed: product.stockQuantity > 0 && !adding
-                        ? onAdd
-                        : null,
-                    icon: adding
-                        ? const SizedBox.square(
-                            dimension: 18,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              color: Colors.white,
+                      onPressed: product.canPurchase && !adding ? onAdd : null,
+                      icon: adding
+                          ? const SizedBox.square(
+                              dimension: 18,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: Colors.white,
+                              ),
+                            )
+                          : const Icon(
+                              Icons.add_shopping_cart_rounded,
+                              size: 20,
                             ),
-                          )
-                        : const Icon(Icons.add_shopping_cart_rounded, size: 20),
+                    ),
                   ),
-                ),
               ],
             ),
           ),
@@ -121,11 +135,13 @@ class ProductCard extends StatelessWidget {
                   ),
                   const Spacer(),
                   Text(
-                    formatVnd(product.price),
+                    product.hasPublishedPrice
+                        ? formatVnd(product.price)
+                        : 'Giá chưa công bố',
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      fontSize: 16,
+                    style: TextStyle(
+                      fontSize: product.hasPublishedPrice ? 16 : 13,
                       color: PawmartColors.greenDark,
                       fontWeight: FontWeight.w900,
                       letterSpacing: -0.3,

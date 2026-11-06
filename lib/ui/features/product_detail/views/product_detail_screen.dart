@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
@@ -11,6 +12,7 @@ import '../../../core/app_theme.dart';
 import '../../../core/formatters.dart';
 import '../../../core/widgets/feedback_states.dart';
 import '../../../core/widgets/product_artwork.dart';
+import '../../../core/widgets/product_review_panel.dart';
 import '../../auth/view_models/auth_view_model.dart';
 import '../view_models/product_detail_view_model.dart';
 
@@ -40,7 +42,7 @@ class _ProductDetailContentState extends State<_ProductDetailContent> {
   bool _adding = false;
 
   Future<void> _add(Product product) async {
-    if (_adding || product.stockQuantity < 1) return;
+    if (_adding || !product.canPurchase) return;
     setState(() => _adding = true);
     final added = await addProductToCart(
       context,
@@ -106,13 +108,16 @@ class _ProductDetailContentState extends State<_ProductDetailContent> {
                 onDecrement: _quantity > 1
                     ? () => setState(() => _quantity--)
                     : null,
-                onIncrement: _quantity < product.stockQuantity
+                onIncrement:
+                    product.canPurchase && _quantity < product.stockQuantity
                     ? () => setState(() => _quantity++)
                     : null,
                 signedIn: context.read<AuthViewModel>().isSignedIn,
               ),
         bottomNavigationBar: product == null
             ? null
+            : product.isPreview
+            ? const _PreviewBottomBar()
             : DecoratedBox(
                 decoration: const BoxDecoration(
                   color: Colors.white,
@@ -151,7 +156,7 @@ class _ProductDetailContentState extends State<_ProductDetailContent> {
                       Expanded(
                         flex: 2,
                         child: FilledButton.icon(
-                          onPressed: product.stockQuantity > 0 && !_adding
+                          onPressed: product.canPurchase && !_adding
                               ? () => _add(product)
                               : null,
                           icon: _adding
@@ -179,6 +184,37 @@ class _ProductDetailContentState extends State<_ProductDetailContent> {
   );
 }
 
+class _PreviewBottomBar extends StatelessWidget {
+  const _PreviewBottomBar();
+
+  @override
+  Widget build(BuildContext context) => DecoratedBox(
+    decoration: const BoxDecoration(
+      color: Colors.white,
+      border: Border(top: BorderSide(color: PawmartColors.line)),
+    ),
+    child: SafeArea(
+      minimum: const EdgeInsets.fromLTRB(20, 12, 20, 12),
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
+        decoration: BoxDecoration(
+          color: PawmartColors.greenPale,
+          borderRadius: BorderRadius.circular(14),
+        ),
+        child: const Text(
+          'Sản phẩm chưa mở bán',
+          textAlign: TextAlign.center,
+          style: TextStyle(
+            color: PawmartColors.greenDark,
+            fontWeight: FontWeight.w800,
+          ),
+        ),
+      ),
+    ),
+  );
+}
+
 class _ProductBody extends StatelessWidget {
   const _ProductBody({
     required this.product,
@@ -199,12 +235,8 @@ class _ProductBody extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final hasDescription = product.description?.trim().isNotEmpty == true;
-    final hasIngredients = product.ingredients?.trim().isNotEmpty == true;
-    final hasNutrition = product.nutritionInfo?.trim().isNotEmpty == true;
     final hasPackageSize = product.packageSize?.trim().isNotEmpty == true;
     final hasLifeStage = product.lifeStage?.trim().isNotEmpty == true;
-    final hasFeedingGuide = product.feedingGuide?.trim().isNotEmpty == true;
     return ListView(
       padding: const EdgeInsets.only(bottom: 28),
       children: [
@@ -266,10 +298,12 @@ class _ProductBody extends StatelessWidget {
                           ),
                           const SizedBox(height: 3),
                           Text(
-                            formatVnd(product.price),
-                            style: const TextStyle(
+                            product.hasPublishedPrice
+                                ? formatVnd(product.price)
+                                : 'Giá chưa công bố',
+                            style: TextStyle(
                               color: PawmartColors.green,
-                              fontSize: 25,
+                              fontSize: product.hasPublishedPrice ? 25 : 18,
                               fontWeight: FontWeight.w900,
                             ),
                           ),
@@ -282,17 +316,19 @@ class _ProductBody extends StatelessWidget {
                         vertical: 7,
                       ),
                       decoration: BoxDecoration(
-                        color: product.stockQuantity > 0
+                        color: product.isPreview || product.stockQuantity > 0
                             ? PawmartColors.greenPale
                             : const Color(0xFFFFECEC),
                         borderRadius: BorderRadius.circular(20),
                       ),
                       child: Text(
-                        product.stockQuantity > 0
+                        product.isPreview
+                            ? 'Chưa mở bán'
+                            : product.stockQuantity > 0
                             ? 'Còn ${product.stockQuantity}'
                             : 'Hết hàng',
                         style: TextStyle(
-                          color: product.stockQuantity > 0
+                          color: product.isPreview || product.stockQuantity > 0
                               ? PawmartColors.greenDark
                               : PawmartColors.error,
                           fontSize: 12,
@@ -303,7 +339,61 @@ class _ProductBody extends StatelessWidget {
                   ],
                 ),
               ),
-              if (model.pets.isNotEmpty) ...[
+              if (product.isPreview) ...[
+                const SizedBox(height: 14),
+                Card(
+                  color: PawmartColors.greenPale,
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'Thông tin sản phẩm',
+                          style: TextStyle(fontWeight: FontWeight.w800),
+                        ),
+                        const SizedBox(height: 5),
+                        Text(
+                          product.description?.trim().isNotEmpty == true
+                              ? product.description!.trim()
+                              : 'Mô tả sản phẩm đang được cập nhật.',
+                        ),
+                        const SizedBox(height: 8),
+                        const Text(
+                          'Giá bán và tồn kho sẽ hiển thị khi PawMart xác nhận.',
+                        ),
+                        if (product.catalogReview?.officialUrl.isNotEmpty ==
+                            true) ...[
+                          const SizedBox(height: 10),
+                          Text(
+                            'Nguồn model: ${Uri.tryParse(product.catalogReview!.officialUrl)?.host ?? 'website hãng'}',
+                          ),
+                          TextButton.icon(
+                            onPressed: () async {
+                              await Clipboard.setData(
+                                ClipboardData(
+                                  text: product.catalogReview!.officialUrl,
+                                ),
+                              );
+                              if (context.mounted) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                    content: Text(
+                                      'Đã sao chép liên kết nguồn.',
+                                    ),
+                                  ),
+                                );
+                              }
+                            },
+                            icon: const Icon(Icons.copy_rounded, size: 16),
+                            label: const Text('Sao chép liên kết nguồn'),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                ),
+              ] else if (model.pets.isNotEmpty) ...[
                 const SizedBox(height: 14),
                 _PetFitCard(
                   product: product,
@@ -347,97 +437,42 @@ class _ProductBody extends StatelessWidget {
                 ),
               ],
               const SizedBox(height: 24),
-              Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      'Số lượng',
-                      style: theme.textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.w800,
+              if (!product.isPreview)
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        'Số lượng',
+                        style: theme.textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.w800,
+                        ),
                       ),
                     ),
-                  ),
-                  IconButton.filledTonal(
-                    tooltip: 'Giảm số lượng',
-                    onPressed: onDecrement,
-                    icon: const Icon(Icons.remove_rounded),
-                  ),
-                  SizedBox(
-                    width: 46,
-                    child: Text(
-                      '$quantity',
-                      textAlign: TextAlign.center,
-                      style: const TextStyle(
-                        fontSize: 17,
-                        fontWeight: FontWeight.w800,
+                    IconButton.filledTonal(
+                      tooltip: 'Giảm số lượng',
+                      onPressed: onDecrement,
+                      icon: const Icon(Icons.remove_rounded),
+                    ),
+                    SizedBox(
+                      width: 46,
+                      child: Text(
+                        '$quantity',
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(
+                          fontSize: 17,
+                          fontWeight: FontWeight.w800,
+                        ),
                       ),
                     ),
-                  ),
-                  IconButton.filled(
-                    tooltip: 'Tăng số lượng',
-                    onPressed: onIncrement,
-                    icon: const Icon(Icons.add_rounded),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 24),
-              Text(
-                'Thông tin sản phẩm',
-                style: theme.textTheme.titleLarge?.copyWith(
-                  fontWeight: FontWeight.w800,
+                    IconButton.filled(
+                      tooltip: 'Tăng số lượng',
+                      onPressed: onIncrement,
+                      icon: const Icon(Icons.add_rounded),
+                    ),
+                  ],
                 ),
-              ),
-              const SizedBox(height: 12),
-              Card(
-                child: Padding(
-                  padding: const EdgeInsets.all(18),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      if (hasDescription)
-                        _DetailBlock(
-                          icon: Icons.description_outlined,
-                          title: 'Mô tả',
-                          value: product.description!.trim(),
-                        ),
-                      if (hasIngredients) ...[
-                        if (hasDescription) const Divider(height: 28),
-                        _DetailBlock(
-                          icon: Icons.grass_outlined,
-                          title: 'Thành phần',
-                          value: product.ingredients!.trim(),
-                        ),
-                      ],
-                      if (hasNutrition) ...[
-                        if (hasDescription || hasIngredients)
-                          const Divider(height: 28),
-                        _DetailBlock(
-                          icon: Icons.monitor_heart_outlined,
-                          title: 'Thông tin dinh dưỡng',
-                          value: product.nutritionInfo!.trim(),
-                        ),
-                      ],
-                      if (hasFeedingGuide) ...[
-                        if (hasDescription || hasIngredients || hasNutrition)
-                          const Divider(height: 28),
-                        _DetailBlock(
-                          icon: Icons.restaurant_outlined,
-                          title: 'Hướng dẫn sử dụng',
-                          value: product.feedingGuide!.trim(),
-                        ),
-                      ],
-                      if (!hasDescription &&
-                          !hasIngredients &&
-                          !hasNutrition &&
-                          !hasFeedingGuide)
-                        const Text(
-                          'Cửa hàng chưa cập nhật thông tin chi tiết.',
-                          style: TextStyle(color: PawmartColors.muted),
-                        ),
-                    ],
-                  ),
-                ),
-              ),
+              const SizedBox(height: 30),
+              _ProductInformation(product: product),
             ],
           ),
         ),
@@ -475,9 +510,14 @@ class _ProductGalleryState extends State<_ProductGallery> {
         child: Column(
           children: [
             SizedBox(
-              height: 300,
+              height: widget.product.isPreview ? 220 : 300,
               child: images.isEmpty
-                  ? const ProductArtwork(height: 300)
+                  ? widget.product.hasVerifiedImage
+                        ? const ProductArtwork(height: 300)
+                        : ProductReviewPanel(
+                            product: widget.product,
+                            height: 220,
+                          )
                   : PageView.builder(
                       itemCount: images.length,
                       onPageChanged: (index) => setState(() => _index = index),
@@ -550,45 +590,247 @@ class _InfoChip extends StatelessWidget {
   );
 }
 
-class _DetailBlock extends StatelessWidget {
-  const _DetailBlock({
-    required this.icon,
-    required this.title,
-    required this.value,
-  });
-  final IconData icon;
-  final String title;
-  final String value;
+class _ProductInformation extends StatelessWidget {
+  const _ProductInformation({required this.product});
+
+  final Product product;
 
   @override
-  Widget build(BuildContext context) => Row(
-    crossAxisAlignment: CrossAxisAlignment.start,
-    children: [
-      Container(
-        width: 34,
-        height: 34,
-        decoration: BoxDecoration(
-          color: PawmartColors.greenPale,
-          borderRadius: BorderRadius.circular(10),
+  Widget build(BuildContext context) {
+    final description = product.description?.trim() ?? '';
+    final facts = <_ProductFact>[
+      if (product.brand?.trim().isNotEmpty == true)
+        _ProductFact('Thương hiệu', product.brand!.trim()),
+      if (product.targetPetType.trim().isNotEmpty)
+        _ProductFact('Phù hợp', switch (product.targetPetType.toUpperCase()) {
+          'DOG' => 'Chó',
+          'CAT' => 'Mèo',
+          'ALL' => 'Chó và mèo',
+          _ => product.targetPetType,
+        }),
+      if (product.packageSize?.trim().isNotEmpty == true)
+        _ProductFact('Quy cách', product.packageSize!.trim()),
+      if (product.lifeStage?.trim().isNotEmpty == true)
+        _ProductFact('Độ tuổi', product.lifeStage!.trim()),
+      if (product.sku?.trim().isNotEmpty == true)
+        _ProductFact('Mã sản phẩm', product.sku!.trim()),
+    ];
+    final sections = <({IconData icon, String title, String value})>[
+      if (product.ingredients?.trim().isNotEmpty == true)
+        (
+          icon: Icons.grass_outlined,
+          title: 'Thành phần',
+          value: product.ingredients!.trim(),
         ),
-        child: Icon(icon, color: PawmartColors.green, size: 18),
-      ),
-      const SizedBox(width: 12),
-      Expanded(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(title, style: const TextStyle(fontWeight: FontWeight.w800)),
-            const SizedBox(height: 5),
-            Text(
-              value,
-              style: const TextStyle(color: PawmartColors.ink, height: 1.45),
+      if (product.nutritionInfo?.trim().isNotEmpty == true)
+        (
+          icon: Icons.monitor_heart_outlined,
+          title: 'Thông tin dinh dưỡng',
+          value: product.nutritionInfo!.trim(),
+        ),
+      if (product.feedingGuide?.trim().isNotEmpty == true)
+        (
+          icon: Icons.menu_book_outlined,
+          title: 'Hướng dẫn sử dụng',
+          value: product.feedingGuide!.trim(),
+        ),
+    ];
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'TÌM HIỂU SẢN PHẨM',
+          style: TextStyle(
+            color: PawmartColors.green,
+            fontSize: 11,
+            fontWeight: FontWeight.w800,
+            letterSpacing: 1.4,
+          ),
+        ),
+        const SizedBox(height: 6),
+        Text(
+          'Thông tin sản phẩm',
+          style: Theme.of(context).textTheme.headlineSmall,
+        ),
+        const SizedBox(height: 16),
+        Container(
+          width: double.infinity,
+          clipBehavior: Clip.antiAlias,
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(22),
+            border: Border.all(color: PawmartColors.line),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 22, 20, 23),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Container(
+                          width: 38,
+                          height: 38,
+                          decoration: BoxDecoration(
+                            color: PawmartColors.greenPale,
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: const Icon(
+                            Icons.article_outlined,
+                            color: PawmartColors.green,
+                            size: 21,
+                          ),
+                        ),
+                        const SizedBox(width: 11),
+                        const Text(
+                          'Mô tả sản phẩm',
+                          style: TextStyle(
+                            color: PawmartColors.ink,
+                            fontSize: 17,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 17),
+                    Text(
+                      description.isNotEmpty
+                          ? description
+                          : product.isPreview
+                          ? 'Mô tả chi tiết đang được đối chiếu với nhà sản xuất.'
+                          : 'Cửa hàng chưa cập nhật mô tả sản phẩm.',
+                      style: const TextStyle(
+                        color: PawmartColors.ink,
+                        fontSize: 16,
+                        height: 1.6,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              if (facts.isNotEmpty) ...[
+                const Divider(height: 1),
+                Container(
+                  width: double.infinity,
+                  color: PawmartColors.greenPale,
+                  padding: const EdgeInsets.fromLTRB(20, 19, 20, 21),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'THÔNG SỐ CƠ BẢN',
+                        style: TextStyle(
+                          color: PawmartColors.muted,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: 1,
+                        ),
+                      ),
+                      const SizedBox(height: 14),
+                      LayoutBuilder(
+                        builder: (context, constraints) {
+                          final columns = constraints.maxWidth < 280 ? 1 : 2;
+                          final width =
+                              (constraints.maxWidth - (columns == 2 ? 12 : 0)) /
+                              columns;
+                          return Wrap(
+                            spacing: 12,
+                            runSpacing: 16,
+                            children: [
+                              for (final fact in facts)
+                                SizedBox(
+                                  width: width,
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        fact.label,
+                                        style: const TextStyle(
+                                          color: PawmartColors.muted,
+                                          fontSize: 12,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 4),
+                                      Text(
+                                        fact.value,
+                                        style: const TextStyle(
+                                          color: PawmartColors.ink,
+                                          fontSize: 15,
+                                          fontWeight: FontWeight.w700,
+                                          height: 1.3,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                            ],
+                          );
+                        },
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
+        for (final section in sections) ...[
+          const SizedBox(height: 12),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: PawmartColors.line),
             ),
-          ],
-        ),
-      ),
-    ],
-  );
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Icon(section.icon, color: PawmartColors.green, size: 21),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        section.title,
+                        style: const TextStyle(
+                          color: PawmartColors.ink,
+                          fontSize: 17,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 14),
+                Text(
+                  section.value,
+                  style: const TextStyle(
+                    color: PawmartColors.ink,
+                    fontSize: 15,
+                    height: 1.55,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+}
+
+class _ProductFact {
+  const _ProductFact(this.label, this.value);
+
+  final String label;
+  final String value;
 }
 
 class _PetFitCard extends StatelessWidget {

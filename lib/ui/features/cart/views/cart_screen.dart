@@ -69,33 +69,50 @@ class _CartContent extends StatelessWidget {
                       ],
                     ),
                   Expanded(
-                    child: ListView.separated(
-                      padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
-                      itemCount: cart.items.length,
-                      separatorBuilder: (_, _) => const SizedBox(height: 10),
-                      itemBuilder: (context, index) =>
-                          _CartItem(line: cart.items[index], viewModel: model),
+                    child: RefreshIndicator(
+                      onRefresh: model.load,
+                      child: ListView.separated(
+                        padding: const EdgeInsets.fromLTRB(20, 18, 20, 24),
+                        itemCount: cart.items.length + 1,
+                        separatorBuilder: (_, _) => const SizedBox(height: 12),
+                        itemBuilder: (context, index) => index == 0
+                            ? _CartHeading(itemCount: cart.totalQuantity)
+                            : _CartItem(
+                                line: cart.items[index - 1],
+                                viewModel: model,
+                              ),
+                      ),
                     ),
                   ),
                   SafeArea(
                     top: false,
                     child: Container(
-                      padding: const EdgeInsets.fromLTRB(18, 16, 18, 12),
+                      padding: const EdgeInsets.fromLTRB(20, 16, 20, 12),
                       decoration: const BoxDecoration(
                         color: Colors.white,
-                        borderRadius: BorderRadius.vertical(
-                          top: Radius.circular(22),
+                        border: Border(
+                          top: BorderSide(color: PawmartColors.line),
                         ),
                       ),
                       child: Column(
                         children: [
                           Row(
                             children: [
-                              const Expanded(child: Text('Tạm tính')),
+                              const Expanded(
+                                child: Text(
+                                  'Tạm tính',
+                                  style: TextStyle(
+                                    color: PawmartColors.muted,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ),
                               Text(
                                 formatVnd(cart.subtotal),
                                 style: const TextStyle(
-                                  fontWeight: FontWeight.w800,
+                                  color: PawmartColors.greenDark,
+                                  fontSize: 21,
+                                  fontWeight: FontWeight.w900,
                                 ),
                               ),
                             ],
@@ -111,12 +128,16 @@ class _CartContent extends StatelessWidget {
                               ),
                             ),
                           ),
-                          const SizedBox(height: 12),
-                          FilledButton(
+                          const SizedBox(height: 16),
+                          FilledButton.icon(
                             onPressed: model.isSaving
                                 ? null
                                 : () => context.go('/customer/checkout'),
-                            child: Text('Tiếp tục thanh toán'),
+                            icon: const Icon(
+                              Icons.lock_outline_rounded,
+                              size: 18,
+                            ),
+                            label: const Text('Tiếp tục thanh toán'),
                           ),
                         ],
                       ),
@@ -129,6 +150,45 @@ class _CartContent extends StatelessWidget {
   );
 }
 
+class _CartHeading extends StatelessWidget {
+  const _CartHeading({required this.itemCount});
+  final int itemCount;
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.only(bottom: 4),
+    child: Row(
+      children: [
+        const Expanded(
+          child: Text(
+            'Sản phẩm đã chọn',
+            style: TextStyle(
+              color: PawmartColors.ink,
+              fontSize: 18,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+        ),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 6),
+          decoration: BoxDecoration(
+            color: PawmartColors.greenPale,
+            borderRadius: BorderRadius.circular(9),
+          ),
+          child: Text(
+            '$itemCount món',
+            style: const TextStyle(
+              color: PawmartColors.greenDark,
+              fontSize: 12,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+        ),
+      ],
+    ),
+  );
+}
+
 class _CartItem extends StatelessWidget {
   const _CartItem({required this.line, required this.viewModel});
   final CartLine line;
@@ -137,81 +197,129 @@ class _CartItem extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Card(
     child: Padding(
-      padding: const EdgeInsets.all(12),
-      child: Row(
+      padding: const EdgeInsets.all(14),
+      child: Column(
         children: [
-          SizedBox(
-            width: 74,
-            child: ProductArtwork(imageUrl: line.imageUrl, height: 74),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  line.productName,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(fontWeight: FontWeight.w700),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                width: 90,
+                height: 90,
+                padding: const EdgeInsets.all(7),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF4F6F2),
+                  borderRadius: BorderRadius.circular(15),
                 ),
-                const SizedBox(height: 4),
-                Text(
-                  formatVnd(line.unitPrice),
-                  style: const TextStyle(
-                    color: PawmartColors.greenDark,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Row(
+                child: ProductArtwork(imageUrl: line.imageUrl, height: 76),
+              ),
+              const SizedBox(width: 13),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    IconButton(
-                      tooltip: 'Giảm số lượng',
-                      visualDensity: VisualDensity.compact,
-                      onPressed: viewModel.isSaving
-                          ? null
-                          : () => viewModel.setQuantity(
-                              line.productId,
-                              line.quantity - 1,
-                            ),
-                      icon: const Icon(Icons.remove_circle_outline),
-                    ),
                     Text(
-                      '${line.quantity}',
-                      style: const TextStyle(fontWeight: FontWeight.w700),
+                      line.productName,
+                      maxLines: 3,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: PawmartColors.ink,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w800,
+                        height: 1.3,
+                      ),
                     ),
-                    IconButton(
-                      tooltip: 'Tăng số lượng',
-                      visualDensity: VisualDensity.compact,
-                      onPressed:
-                          viewModel.isSaving ||
-                              line.quantity >= line.availableStock
-                          ? null
-                          : () => viewModel.setQuantity(
-                              line.productId,
-                              line.quantity + 1,
-                            ),
-                      icon: const Icon(Icons.add_circle_outline),
-                    ),
-                    const Spacer(),
-                    IconButton(
-                      tooltip: 'Bỏ sản phẩm',
-                      onPressed: viewModel.isSaving
-                          ? null
-                          : () => viewModel.remove(line.productId),
-                      icon: const Icon(
-                        Icons.delete_outline,
-                        color: PawmartColors.error,
+                    const SizedBox(height: 8),
+                    Text(
+                      formatVnd(line.unitPrice),
+                      style: const TextStyle(
+                        color: PawmartColors.muted,
+                        fontSize: 12,
                       ),
                     ),
                   ],
                 ),
-              ],
-            ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 13),
+          const Divider(height: 1),
+          const SizedBox(height: 9),
+          Row(
+            children: [
+              _QuantityControl(line: line, viewModel: viewModel),
+              const Spacer(),
+              IconButton(
+                tooltip: 'Bỏ sản phẩm',
+                onPressed: viewModel.isSaving
+                    ? null
+                    : () => viewModel.remove(line.productId),
+                icon: const Icon(Icons.delete_outline_rounded, size: 21),
+                color: PawmartColors.muted,
+              ),
+            ],
+          ),
+          const SizedBox(height: 3),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.end,
+            children: [
+              const Text(
+                'Thành tiền',
+                style: TextStyle(color: PawmartColors.muted, fontSize: 12),
+              ),
+              const SizedBox(width: 9),
+              Text(
+                formatVnd(line.lineTotal),
+                style: const TextStyle(
+                  color: PawmartColors.greenDark,
+                  fontSize: 16,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+            ],
           ),
         ],
       ),
+    ),
+  );
+}
+
+class _QuantityControl extends StatelessWidget {
+  const _QuantityControl({required this.line, required this.viewModel});
+  final CartLine line;
+  final CartViewModel viewModel;
+
+  @override
+  Widget build(BuildContext context) => Container(
+    decoration: BoxDecoration(
+      color: PawmartColors.cream,
+      borderRadius: BorderRadius.circular(12),
+      border: Border.all(color: PawmartColors.line),
+    ),
+    child: Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        IconButton(
+          tooltip: 'Giảm số lượng',
+          constraints: const BoxConstraints(minWidth: 40, minHeight: 40),
+          onPressed: viewModel.isSaving
+              ? null
+              : () => viewModel.setQuantity(line.productId, line.quantity - 1),
+          icon: const Icon(Icons.remove_rounded, size: 18),
+        ),
+        Text(
+          '${line.quantity}',
+          style: const TextStyle(fontWeight: FontWeight.w800),
+        ),
+        IconButton(
+          tooltip: 'Tăng số lượng',
+          constraints: const BoxConstraints(minWidth: 40, minHeight: 40),
+          onPressed: viewModel.isSaving || line.quantity >= line.availableStock
+              ? null
+              : () => viewModel.setQuantity(line.productId, line.quantity + 1),
+          icon: const Icon(Icons.add_rounded, size: 18),
+        ),
+      ],
     ),
   );
 }

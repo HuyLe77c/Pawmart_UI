@@ -102,6 +102,7 @@ class _AssistantBodyState extends State<_AssistantBody> {
         }
         if (model.errorMessage != null && model.pets.isEmpty) {
           return _State(
+            title: 'Chưa tải được hồ sơ',
             message: model.errorMessage!,
             action: 'Thử lại',
             onPressed: model.loadPets,
@@ -109,9 +110,11 @@ class _AssistantBodyState extends State<_AssistantBody> {
         }
         if (model.pets.isEmpty) {
           return _State(
+            title: 'Tư vấn theo hồ sơ của bé',
             message: 'Thêm hồ sơ thú cưng để nhận tư vấn phù hợp cho bé.',
-            action: 'Đến hồ sơ',
+            action: 'Tạo hồ sơ thú cưng',
             onPressed: () => context.go('/customer/profile'),
+            secondaryAction: () => context.go('/customer/chat-ai'),
           );
         }
         final pet =
@@ -529,27 +532,73 @@ class _AdviceCard extends StatelessWidget {
 
 class _State extends StatelessWidget {
   const _State({
+    required this.title,
     required this.message,
     required this.action,
     required this.onPressed,
+    this.secondaryAction,
   });
+  final String title;
   final String message;
   final String action;
   final VoidCallback onPressed;
+  final VoidCallback? secondaryAction;
 
   @override
   Widget build(BuildContext context) => Center(
-    child: Padding(
-      padding: const EdgeInsets.all(24),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          const Icon(Icons.pets_rounded, color: PawmartColors.green, size: 44),
-          const SizedBox(height: 16),
-          Text(message, textAlign: TextAlign.center),
-          const SizedBox(height: 18),
-          FilledButton(onPressed: onPressed, child: Text(action)),
-        ],
+    child: SingleChildScrollView(
+      padding: const EdgeInsets.all(20),
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 420),
+        child: Container(
+          padding: const EdgeInsets.all(24),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            border: Border.all(color: PawmartColors.line),
+            borderRadius: BorderRadius.circular(24),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                width: 56,
+                height: 56,
+                decoration: BoxDecoration(
+                  color: PawmartColors.greenPale,
+                  borderRadius: BorderRadius.circular(17),
+                ),
+                child: const Icon(
+                  Icons.pets_rounded,
+                  color: PawmartColors.green,
+                  size: 29,
+                ),
+              ),
+              const SizedBox(height: 22),
+              Text(title, style: Theme.of(context).textTheme.titleLarge),
+              const SizedBox(height: 8),
+              Text(
+                message,
+                style: const TextStyle(color: PawmartColors.muted, height: 1.5),
+              ),
+              const SizedBox(height: 24),
+              SizedBox(
+                width: double.infinity,
+                child: FilledButton(onPressed: onPressed, child: Text(action)),
+              ),
+              if (secondaryAction != null) ...[
+                const SizedBox(height: 8),
+                SizedBox(
+                  width: double.infinity,
+                  child: TextButton(
+                    onPressed: secondaryAction,
+                    child: const Text('Hỏi PawMart không cần hồ sơ'),
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
       ),
     ),
   );

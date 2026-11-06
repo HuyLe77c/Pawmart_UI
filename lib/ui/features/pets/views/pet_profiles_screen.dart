@@ -105,16 +105,14 @@ class _PetProfilesContent extends StatelessWidget {
                 padding: const EdgeInsets.fromLTRB(20, 14, 20, 24),
                 children: [
                   const _AccountHeader(),
-                  const SizedBox(height: 34),
-                  const EmptyState(
-                    title: 'Thêm thành viên bốn chân',
-                    message: 'Lưu tuổi, giống và cân nặng để nhận gợi ý thức ăn phù hợp.',
-                  ),
-                  const SizedBox(height: 16),
-                  FilledButton.icon(
-                    onPressed: () => _openForm(context),
-                    icon: const Icon(Icons.add_rounded),
-                    label: const Text('Tạo hồ sơ cho bé'),
+                  const SizedBox(height: 22),
+                  Card(
+                    child: EmptyState(
+                      title: 'Thêm thành viên bốn chân',
+                      message: 'Lưu tuổi, giống và cân nặng để nhận gợi ý thức ăn phù hợp.',
+                      actionLabel: 'Tạo hồ sơ cho bé',
+                      onAction: () => _openForm(context),
+                    ),
                   ),
                 ],
               ),

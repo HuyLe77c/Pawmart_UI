@@ -32,6 +32,9 @@ class CustomerShell extends StatelessWidget {
       ),
       child: NavigationBar(
         selectedIndex: _selectedIndex,
+        labelBehavior: MediaQuery.sizeOf(context).width < 360
+            ? NavigationDestinationLabelBehavior.onlyShowSelected
+            : NavigationDestinationLabelBehavior.alwaysShow,
         onDestinationSelected: (index) => context.go(_destinations[index].$2),
         destinations: const [
           NavigationDestination(

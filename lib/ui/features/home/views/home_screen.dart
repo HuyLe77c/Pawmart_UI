@@ -4,9 +4,11 @@ import 'package:provider/provider.dart';
 
 import '../../../../data/repositories/cart_repository.dart';
 import '../../../../data/repositories/catalog_repository.dart';
+import '../../../../data/repositories/orders_repository.dart';
 import '../../../../data/services/api_client.dart';
 import '../../../../domain/models/category.dart';
 import '../../../../domain/models/product.dart';
+import '../../../../domain/models/order.dart';
 import '../../../core/app_theme.dart';
 import '../../../core/category_label.dart';
 import '../../../core/formatters.dart';
@@ -21,8 +23,10 @@ class HomeScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => ChangeNotifierProvider(
-    create: (context) =>
-        HomeViewModel(CatalogRepository(context.read<ApiClient>()))..load(),
+    create: (context) => HomeViewModel(
+      CatalogRepository(context.read<ApiClient>()),
+      OrdersRepository(context.read<ApiClient>()),
+    )..load(),
     child: const _HomeContent(),
   );
 }
@@ -38,7 +42,7 @@ class _HomeContentState extends State<_HomeContent> {
   int? _addingId;
 
   Future<void> _addToCart(Product product) async {
-    if (_addingId != null) return;
+    if (_addingId != null || !product.canPurchase) return;
     setState(() => _addingId = product.productId);
     try {
       final repository = CartRepository(context.read<ApiClient>());
@@ -76,11 +80,24 @@ class _HomeContentState extends State<_HomeContent> {
   @override
   Widget build(BuildContext context) => Consumer<HomeViewModel>(
     builder: (context, model, _) {
+      final heroProduct =
+          model.featured
+              .where(
+                (product) => product.canPurchase && product.hasVerifiedImage,
+              )
+              .firstOrNull ??
+          model.products
+              .where(
+                (product) => product.canPurchase && product.hasVerifiedImage,
+              )
+              .firstOrNull;
       final extraProducts = model.products
           .where(
-            (product) => !model.featured.any(
-              (featured) => featured.productId == product.productId,
-            ),
+            (product) =>
+                !model.featured.any(
+                  (featured) => featured.productId == product.productId,
+                ) &&
+                product.productId != heroProduct?.productId,
           )
           .toList(growable: false);
       return Scaffold(
@@ -96,13 +113,19 @@ class _HomeContentState extends State<_HomeContent> {
                     slivers: [
                       SliverToBoxAdapter(child: _HomeHeader()),
                       SliverToBoxAdapter(child: _SearchShortcut()),
-                      if (model.featured.isNotEmpty)
+                      const SliverToBoxAdapter(child: _PetShortcuts()),
+                      if (model.products.any((product) => product.isPreview))
+                        const SliverToBoxAdapter(
+                          child: Padding(
+                            padding: EdgeInsets.fromLTRB(20, 14, 20, 0),
+                            child: _CatalogReviewNotice(),
+                          ),
+                        ),
+                      if (heroProduct != null)
                         SliverToBoxAdapter(
                           child: Padding(
                             padding: const EdgeInsets.fromLTRB(20, 18, 20, 0),
-                            child: _SpotlightCard(
-                              product: model.featured.first,
-                            ),
+                            child: _SpotlightCard(product: heroProduct),
                           ),
                         ),
                       if (model.promotions.isNotEmpty)
@@ -115,7 +138,6 @@ class _HomeContentState extends State<_HomeContent> {
                             ),
                           ),
                         ),
-                      SliverToBoxAdapter(child: _ChatAiShortcut()),
                       if (model.categories.isNotEmpty) ...[
                         SliverToBoxAdapter(
                           child: _SectionTitle(
@@ -126,7 +148,7 @@ class _HomeContentState extends State<_HomeContent> {
                         ),
                         SliverToBoxAdapter(
                           child: SizedBox(
-                            height: 52,
+                            height: 120,
                             child: ListView.separated(
                               scrollDirection: Axis.horizontal,
                               padding: const EdgeInsets.symmetric(
@@ -135,9 +157,20 @@ class _HomeContentState extends State<_HomeContent> {
                               itemCount: model.categories.length,
                               separatorBuilder: (_, _) =>
                                   const SizedBox(width: 10),
-                              itemBuilder: (context, index) => _CategoryCard(
-                                category: model.categories[index],
-                              ),
+                              itemBuilder: (context, index) {
+                                final category = model.categories[index];
+                                return _CategoryCard(
+                                  category: category,
+                                  sample: model.products
+                                      .where(
+                                        (product) =>
+                                            product.categoryId ==
+                                                category.categoryId &&
+                                            product.hasVerifiedImage,
+                                      )
+                                      .firstOrNull,
+                                );
+                              },
                             ),
                           ),
                         ),
@@ -170,12 +203,17 @@ class _HomeContentState extends State<_HomeContent> {
                           onAdd: _addToCart,
                         ),
                       ],
+                      SliverToBoxAdapter(child: _ChatAiShortcut()),
                       if (model.products.isEmpty)
                         const SliverToBoxAdapter(
                           child: EmptyState(
                             title: 'Chưa có sản phẩm',
                             message: 'Hãy quay lại sau khi cửa hàng cập nhật sản phẩm.',
                           ),
+                        ),
+                      if (model.publicReviews?.items.isNotEmpty == true)
+                        SliverToBoxAdapter(
+                          child: _CustomerVoices(reviews: model.publicReviews!),
                         ),
                       const SliverToBoxAdapter(child: SizedBox(height: 28)),
                     ],
@@ -190,13 +228,18 @@ class _HomeContentState extends State<_HomeContent> {
 class _HomeHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.fromLTRB(20, 14, 12, 20),
+    padding: const EdgeInsets.fromLTRB(20, 10, 12, 13),
     child: Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Row(
           children: [
             const Expanded(child: BrandLockup(compact: true)),
+            IconButton(
+              tooltip: 'Địa chỉ cửa hàng',
+              onPressed: () => context.push('/stores'),
+              icon: const Icon(Icons.storefront_outlined),
+            ),
             IconButton(
               tooltip: 'Thông báo',
               onPressed: () => context.go('/customer/notifications'),
@@ -209,14 +252,14 @@ class _HomeHeader extends StatelessWidget {
             ),
           ],
         ),
-        const SizedBox(height: 24),
+        const SizedBox(height: 15),
         Text(
-          'Mọi thứ cho bé cưng.',
+          'Chọn điều tốt cho bé.',
           style: Theme.of(context).textTheme.headlineMedium,
         ),
         const SizedBox(height: 5),
         const Text(
-          'Chọn món phù hợp, đặt hàng thật dễ dàng.',
+          'Thức ăn, đồ chơi và chăm sóc mỗi ngày.',
           style: TextStyle(color: PawmartColors.muted, fontSize: 14),
         ),
       ],
@@ -254,6 +297,88 @@ class _SearchShortcut extends StatelessWidget {
               Icon(Icons.tune_rounded, color: PawmartColors.green, size: 20),
             ],
           ),
+        ),
+      ),
+    ),
+  );
+}
+
+class _PetShortcuts extends StatelessWidget {
+  const _PetShortcuts();
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.fromLTRB(20, 10, 20, 0),
+    child: Row(
+      children: [
+        Expanded(
+          child: _PetShortcut(
+            label: 'Mua cho cún',
+            icon: Icons.pets_rounded,
+            tint: const Color(0xFFFFEBDC),
+            onTap: () => context.go('/customer/categories?petType=DOG'),
+          ),
+        ),
+        const SizedBox(width: 10),
+        Expanded(
+          child: _PetShortcut(
+            label: 'Mua cho mèo',
+            icon: Icons.pets_rounded,
+            tint: const Color(0xFFE6E8FC),
+            onTap: () => context.go('/customer/categories?petType=CAT'),
+          ),
+        ),
+      ],
+    ),
+  );
+}
+
+class _PetShortcut extends StatelessWidget {
+  const _PetShortcut({
+    required this.label,
+    required this.icon,
+    required this.tint,
+    required this.onTap,
+  });
+
+  final String label;
+  final IconData icon;
+  final Color tint;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) => Material(
+    color: tint,
+    borderRadius: BorderRadius.circular(14),
+    clipBehavior: Clip.antiAlias,
+    child: InkWell(
+      onTap: onTap,
+      child: SizedBox(
+        height: 49,
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(icon, size: 19, color: PawmartColors.greenDark),
+            const SizedBox(width: 7),
+            Flexible(
+              child: Text(
+                label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  color: PawmartColors.greenDark,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ),
+            const SizedBox(width: 4),
+            const Icon(
+              Icons.chevron_right_rounded,
+              size: 17,
+              color: PawmartColors.greenDark,
+            ),
+          ],
         ),
       ),
     ),
@@ -324,13 +449,13 @@ class _SpotlightCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Material(
-    color: PawmartColors.greenDark,
+    color: const Color(0xFFE3F2DA),
     borderRadius: BorderRadius.circular(24),
     clipBehavior: Clip.antiAlias,
     child: InkWell(
       onTap: () => context.push('/products/${product.productId}'),
       child: SizedBox(
-        height: 202,
+        height: 218,
         child: Padding(
           padding: const EdgeInsets.all(18),
           child: Row(
@@ -341,67 +466,73 @@ class _SpotlightCard extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     const Text(
-                      'SẢN PHẨM NỔI BẬT',
+                      'DÀNH CHO BÉ CƯNG',
                       style: TextStyle(
-                        color: Color(0xFFC9E9D8),
+                        color: PawmartColors.green,
                         fontSize: 11,
                         fontWeight: FontWeight.w800,
-                        letterSpacing: 1,
+                        letterSpacing: 0.8,
                       ),
                     ),
                     const SizedBox(height: 9),
                     Text(
                       product.productName,
-                      maxLines: 3,
+                      maxLines: 4,
                       overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 18,
-                        height: 1.2,
+                        color: PawmartColors.greenDark,
+                        fontSize: 17,
+                        height: 1.18,
                         fontWeight: FontWeight.w800,
                       ),
                     ),
                     const Spacer(),
                     Text(
-                      formatVnd(product.price),
+                      product.hasPublishedPrice
+                          ? formatVnd(product.price)
+                          : 'Xem chi tiết',
                       style: const TextStyle(
-                        color: Colors.white,
+                        color: PawmartColors.greenDark,
                         fontWeight: FontWeight.w800,
-                        fontSize: 17,
+                        fontSize: 18,
                       ),
                     ),
-                    const SizedBox(height: 8),
+                    const SizedBox(height: 7),
                     const Row(
                       children: [
                         Text(
                           'Xem sản phẩm',
                           style: TextStyle(
-                            color: Color(0xFFC9E9D8),
+                            color: PawmartColors.green,
                             fontSize: 13,
                             fontWeight: FontWeight.w700,
                           ),
                         ),
-                        SizedBox(width: 4),
-                        Icon(
-                          Icons.arrow_forward_rounded,
-                          color: Color(0xFFC9E9D8),
-                          size: 16,
+                        SizedBox(width: 7),
+                        CircleAvatar(
+                          radius: 11,
+                          backgroundColor: PawmartColors.amber,
+                          child: Icon(
+                            Icons.arrow_forward_rounded,
+                            color: Colors.white,
+                            size: 14,
+                          ),
                         ),
                       ],
                     ),
                   ],
                 ),
               ),
-              const SizedBox(width: 14),
+              const SizedBox(width: 10),
               Expanded(
                 flex: 5,
                 child: ClipRRect(
-                  borderRadius: BorderRadius.circular(18),
+                  borderRadius: BorderRadius.circular(20),
                   child: ColoredBox(
-                    color: const Color(0xFFF2F5F0),
+                    color: Colors.white,
                     child: ProductArtwork(
                       imageUrl: product.primaryImageUrl,
-                      height: 166,
+                      height: 182,
                     ),
                   ),
                 ),
@@ -451,6 +582,39 @@ class _PromotionStrip extends StatelessWidget {
   );
 }
 
+class _CatalogReviewNotice extends StatelessWidget {
+  const _CatalogReviewNotice();
+
+  @override
+  Widget build(BuildContext context) => Container(
+    width: double.infinity,
+    padding: const EdgeInsets.all(16),
+    decoration: BoxDecoration(
+      color: PawmartColors.greenPale,
+      borderRadius: BorderRadius.circular(16),
+      border: Border.all(color: PawmartColors.line),
+    ),
+    child: const Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Catalog mới tại PawMart',
+          style: TextStyle(
+            color: PawmartColors.greenDark,
+            fontWeight: FontWeight.w800,
+            fontSize: 16,
+          ),
+        ),
+        SizedBox(height: 4),
+        Text(
+          'Bạn có thể xem sản phẩm mới. Ảnh và giá đang được kiểm tra; các mẫu này chưa mở bán.',
+          style: TextStyle(color: PawmartColors.ink, height: 1.35),
+        ),
+      ],
+    ),
+  );
+}
+
 class _SectionTitle extends StatelessWidget {
   const _SectionTitle({
     required this.title,
@@ -479,54 +643,85 @@ class _SectionTitle extends StatelessWidget {
 }
 
 class _CategoryCard extends StatelessWidget {
-  const _CategoryCard({required this.category});
+  const _CategoryCard({required this.category, this.sample});
   final Category category;
+  final Product? sample;
 
   @override
-  Widget build(BuildContext context) => Material(
-    color: Colors.white,
-    borderRadius: BorderRadius.circular(26),
-    child: InkWell(
-      borderRadius: BorderRadius.circular(26),
-      onTap: () =>
-          context.go('/customer/categories?categoryId=${category.categoryId}'),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 15),
-        decoration: BoxDecoration(
-          border: Border.all(color: PawmartColors.line),
-          borderRadius: BorderRadius.circular(26),
+  Widget build(BuildContext context) {
+    final name = displayCategoryName(category.categoryName);
+    final lower = name.toLowerCase();
+    final (icon, tint, accent) = lower.contains('thức ăn')
+        ? (
+            Icons.restaurant_rounded,
+            const Color(0xFFFFEBD9),
+            PawmartColors.amber,
+          )
+        : lower.contains('đồ chơi')
+        ? (Icons.toys_rounded, const Color(0xFFE9E5FF), const Color(0xFF7253A5))
+        : lower.contains('chăm sóc')
+        ? (Icons.spa_rounded, const Color(0xFFE0F2ED), PawmartColors.green)
+        : lower.contains('bổ sung')
+        ? (
+            Icons.medical_services_outlined,
+            const Color(0xFFFFE9E7),
+            const Color(0xFFB95B50),
+          )
+        : (
+            Icons.pets_rounded,
+            const Color(0xFFE7EFFB),
+            const Color(0xFF4B7299),
+          );
+    final imageUrl = category.imageUrl?.isNotEmpty == true
+        ? category.imageUrl
+        : sample?.primaryImageUrl;
+    return Material(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(18),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(18),
+        onTap: () => context.go(
+          '/customer/categories?categoryId=${category.categoryId}',
         ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            if (category.imageUrl?.isNotEmpty == true)
-              Padding(
-                padding: const EdgeInsets.only(right: 9),
-                child: SizedBox(
-                  width: 30,
-                  child: ProductArtwork(
-                    imageUrl: category.imageUrl,
-                    height: 30,
-                  ),
+        child: Container(
+          width: 138,
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            border: Border.all(color: PawmartColors.line),
+            borderRadius: BorderRadius.circular(18),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                width: double.infinity,
+                height: 62,
+                decoration: BoxDecoration(
+                  color: tint,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: imageUrl == null
+                    ? Icon(icon, color: accent, size: 28)
+                    : ProductArtwork(imageUrl: imageUrl, height: 62),
+              ),
+              const Spacer(),
+              Text(
+                name,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w800,
+                  height: 1.15,
+                  color: PawmartColors.ink,
                 ),
               ),
-            Text(
-              displayCategoryName(category.categoryName),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
-            ),
-            const SizedBox(width: 8),
-            const Icon(
-              Icons.chevron_right_rounded,
-              color: PawmartColors.green,
-              size: 18,
-            ),
-          ],
+            ],
+          ),
         ),
       ),
-    ),
-  );
+    );
+  }
 }
 
 class _ProductGrid extends StatelessWidget {
@@ -559,6 +754,110 @@ class _ProductGrid extends StatelessWidget {
           onAdd: () => onAdd(product),
         );
       },
+    ),
+  );
+}
+
+class _CustomerVoices extends StatelessWidget {
+  const _CustomerVoices({required this.reviews});
+  final PublicOrderReviews reviews;
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.only(top: 24),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 20),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Khách hàng chia sẻ',
+                style: TextStyle(
+                  fontSize: 19,
+                  fontWeight: FontWeight.w800,
+                  color: PawmartColors.ink,
+                ),
+              ),
+              const SizedBox(height: 3),
+              Text(
+                '${reviews.averageRating.toStringAsFixed(1)}/5 · ${reviews.total} đánh giá từ đơn hàng đã hoàn tất',
+                style: const TextStyle(
+                  color: PawmartColors.muted,
+                  fontSize: 12,
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 12),
+        SizedBox(
+          height: 170,
+          child: ListView.separated(
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.symmetric(horizontal: 20),
+            itemCount: reviews.items.length,
+            separatorBuilder: (_, _) => const SizedBox(width: 10),
+            itemBuilder: (context, index) {
+              final review = reviews.items[index];
+              return SizedBox(
+                width: 270,
+                child: Card(
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                review.authorName,
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.w800,
+                                ),
+                              ),
+                            ),
+                            Text(
+                              '${review.rating}/5 ★',
+                              style: const TextStyle(
+                                color: Color(0xFFB67B20),
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 10),
+                        Expanded(
+                          child: Text(
+                            review.comment?.isNotEmpty == true
+                                ? review.comment!
+                                : 'Đánh giá bằng số sao',
+                            maxLines: 4,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        if (review.shopReply?.isNotEmpty == true)
+                          Text(
+                            'PawMart: ${review.shopReply}',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              fontSize: 11,
+                              color: PawmartColors.greenDark,
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+                ),
+              );
+            },
+          ),
+        ),
+      ],
     ),
   );
 }
