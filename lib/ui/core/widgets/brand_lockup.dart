@@ -8,23 +8,27 @@ class BrandLockup extends StatelessWidget {
   final bool compact;
 
   @override
-  Widget build(BuildContext context) => Row(
+  Widget build(BuildContext context) => compact
+      ? _compactLockup()
+      : Image.asset(
+          'assets/branding/pawmart-logo.png',
+          width: 190,
+          height: 190,
+          fit: BoxFit.contain,
+          semanticLabel: 'PawMart',
+        );
+
+  Widget _compactLockup() => Row(
     mainAxisSize: MainAxisSize.min,
     children: [
-      Container(
-        width: compact ? 40 : 54,
-        height: compact ? 40 : 54,
-        decoration: BoxDecoration(
-          color: PawmartColors.greenDark,
-          borderRadius: BorderRadius.circular(compact ? 13 : 17),
-        ),
-        child: Icon(
-          Icons.pets_rounded,
-          color: Colors.white,
-          size: compact ? 23 : 29,
-        ),
+      Image.asset(
+        'assets/branding/pawmart-mark.png',
+        width: 48,
+        height: 48,
+        fit: BoxFit.contain,
+        semanticLabel: 'Biểu tượng PawMart',
       ),
-      SizedBox(width: compact ? 10 : 12),
+      const SizedBox(width: 6),
       Flexible(
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -35,7 +39,7 @@ class BrandLockup extends StatelessWidget {
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: TextStyle(
-                fontSize: compact ? 20 : 25,
+                fontSize: 20,
                 fontWeight: FontWeight.w900,
                 letterSpacing: -0.6,
                 color: PawmartColors.ink,
@@ -46,8 +50,8 @@ class BrandLockup extends StatelessWidget {
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: TextStyle(
-                fontSize: compact ? 9 : 10,
-                letterSpacing: compact ? 1.1 : 1.2,
+                fontSize: 9,
+                letterSpacing: 1.1,
                 fontWeight: FontWeight.w800,
                 color: PawmartColors.muted,
               ),

@@ -1,0 +1,21 @@
+flutter_launcher_icons:
+  android: true
+  ios: true
+  image_path: assets/branding/pawmart-mark.png
+  adaptive_icon_background: '#FFFFFF'
+  adaptive_icon_foreground: assets/branding/pawmart-mark.png
+  adaptive_icon_foreground_inset: 8
+  remove_alpha_ios: true
+  background_color_ios: '#FFFFFF'
+  web:
+    generate: true
+    image_path: assets/branding/pawmart-mark.png
+    background_color: '#FFFFFF'
+    theme_color: '#104936'
+  windows:
+    generate: true
+    image_path: assets/branding/pawmart-mark.png
+    icon_size: 256
+  macos:
+    generate: true
+    image_path: assets/branding/pawmart-mark.png

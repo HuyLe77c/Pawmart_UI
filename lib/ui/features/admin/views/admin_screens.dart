@@ -72,7 +72,25 @@ class _AdminOverviewScreenState extends State<AdminOverviewScreen> {
     backgroundColor: AdminPalette.background,
     appBar: AppBar(
       backgroundColor: Colors.white,
-      title: const Text('PawMart  /  Quản trị'),
+      title: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Image.asset(
+            'assets/branding/pawmart-mark.png',
+            width: 36,
+            height: 36,
+            semanticLabel: 'PawMart',
+          ),
+          const SizedBox(width: 8),
+          const Flexible(
+            child: Text(
+              'PawMart / Quản trị',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+        ],
+      ),
       actions: [
         IconButton(
           tooltip: 'Làm mới',

@@ -148,13 +148,11 @@ class _CatalogContentState extends State<_CatalogContent> {
         titleSpacing: 0,
         leading: !context.canPop() && !context.read<AuthViewModel>().isSignedIn
             ? Padding(
-                padding: const EdgeInsets.all(8),
-                child: DecoratedBox(
-                  decoration: BoxDecoration(
-                    color: PawmartColors.greenDark,
-                    borderRadius: BorderRadius.circular(13),
-                  ),
-                  child: const Icon(Icons.pets_rounded, color: Colors.white),
+                padding: const EdgeInsets.all(2),
+                child: Image.asset(
+                  'assets/branding/pawmart-mark.png',
+                  fit: BoxFit.contain,
+                  semanticLabel: 'PawMart',
                 ),
               )
             : IconButton.filledTonal(
