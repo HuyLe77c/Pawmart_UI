@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
@@ -32,9 +34,35 @@ class OrderDetailScreen extends StatelessWidget {
   );
 }
 
-class _OrderDetailContent extends StatelessWidget {
+class _OrderDetailContent extends StatefulWidget {
   const _OrderDetailContent({required this.justPlaced});
   final bool justPlaced;
+
+  @override
+  State<_OrderDetailContent> createState() => _OrderDetailContentState();
+}
+
+class _OrderDetailContentState extends State<_OrderDetailContent> {
+  Timer? _paymentRefresh;
+
+  @override
+  void initState() {
+    super.initState();
+    _paymentRefresh = Timer.periodic(const Duration(seconds: 7), (_) {
+      if (!mounted ||
+          ModalRoute.of(context)?.isCurrent != true ||
+          WidgetsBinding.instance.lifecycleState != AppLifecycleState.resumed) {
+        return;
+      }
+      context.read<OrderDetailViewModel>().refreshPaymentStatus();
+    });
+  }
+
+  @override
+  void dispose() {
+    _paymentRefresh?.cancel();
+    super.dispose();
+  }
 
   Future<void> _review(BuildContext context, OrderDetailViewModel model) async {
     final saved = await showModalBottomSheet<bool>(
@@ -108,7 +136,7 @@ class _OrderDetailContent extends StatelessWidget {
                 child: ListView(
                   padding: const EdgeInsets.fromLTRB(16, 8, 16, 28),
                   children: [
-                    if (justPlaced && order.status == 'PENDING') ...[
+                    if (widget.justPlaced && order.status == 'PENDING') ...[
                       _OrderPlacedCard(order: order),
                       const SizedBox(height: 12),
                     ],
@@ -314,7 +342,7 @@ class _OrderPlacedCard extends StatelessWidget {
                 const SizedBox(height: 5),
                 Text(
                   order.paymentMethod == 'BANK_QR'
-                      ? 'Bước tiếp theo: quét mã QR bên dưới. Đơn sẽ được xử lý sau khi cửa hàng xác nhận giao dịch.'
+                      ? 'Bước tiếp theo: quét mã QR bên dưới. Trạng thái thanh toán sẽ tự cập nhật sau khi hệ thống nhận giao dịch.'
                       : 'Bước tiếp theo: chờ cửa hàng xác nhận đơn. Bạn thanh toán khi nhận hàng.',
                   style: const TextStyle(
                     color: PawmartColors.muted,
@@ -666,9 +694,20 @@ class _BankQrPaymentCard extends StatelessWidget {
           if (order.status == 'CANCELLED')
             const Text('Đơn đã hủy. Không chuyển khoản cho đơn này.')
           else if (order.paymentStatus == 'SUCCESS')
-            const Text(
-              'Cửa hàng đã đối soát và xác nhận thanh toán.',
-              style: TextStyle(color: PawmartColors.greenDark),
+            const Row(
+              children: [
+                Icon(Icons.verified_rounded, color: PawmartColors.green),
+                SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'Đã thanh toán thành công',
+                    style: TextStyle(
+                      color: PawmartColors.greenDark,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ),
+              ],
             )
           else if (error != null)
             Text(error!, style: const TextStyle(color: PawmartColors.error))
@@ -680,6 +719,16 @@ class _BankQrPaymentCard extends StatelessWidget {
               ),
             )
           else ...[
+            if (instructions!.receivedAmount > 0) ...[
+              Text(
+                'Đã nhận ${formatVnd(instructions!.receivedAmount)} / ${formatVnd(instructions!.amount)}',
+                style: const TextStyle(
+                  color: PawmartColors.greenDark,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              const SizedBox(height: 8),
+            ],
             const Text(
               'Quét bằng ứng dụng ngân hàng hoặc sao chép thông tin bên dưới.',
               style: TextStyle(color: PawmartColors.muted, fontSize: 12),
@@ -711,7 +760,10 @@ class _BankQrPaymentCard extends StatelessWidget {
             _QrLine('Ngân hàng', instructions!.bankName),
             _QrLine('Chủ tài khoản', instructions!.bankAccountName),
             _QrLine('Số tài khoản', instructions!.bankAccountNo),
-            _QrLine('Số tiền', formatVnd(instructions!.amount)),
+            _QrLine(
+              instructions!.receivedAmount > 0 ? 'Còn cần chuyển' : 'Số tiền',
+              formatVnd(instructions!.amount - instructions!.receivedAmount),
+            ),
             _QrLine('Nội dung', instructions!.transferContent),
             const SizedBox(height: 10),
             Wrap(
@@ -736,7 +788,7 @@ class _BankQrPaymentCard extends StatelessWidget {
             ),
             const SizedBox(height: 8),
             const Text(
-              'Kiểm tra đúng tên người nhận trong ứng dụng ngân hàng. Chỉ chuyển đúng số tiền và nội dung trên. Đơn sẽ chờ xác nhận cho tới khi cửa hàng đối soát giao dịch ngân hàng.',
+              'Kiểm tra đúng tên người nhận trong ứng dụng ngân hàng. Giữ nguyên nội dung chuyển khoản. Hệ thống sẽ tự cập nhật khi nhận được giao dịch; nếu đã chuyển mà trạng thái chưa đổi, hãy liên hệ cửa hàng.',
               style: TextStyle(color: PawmartColors.muted, fontSize: 12),
             ),
           ],
@@ -789,6 +841,10 @@ class _TrackingMapCard extends StatelessWidget {
       _ => 'Theo dõi đơn hàng',
     };
     final description = switch (order.status) {
+      'PENDING'
+          when order.paymentMethod == 'BANK_QR' &&
+              order.paymentStatus == 'SUCCESS' =>
+        'Đã nhận thanh toán. Cửa hàng sẽ xác nhận và chuẩn bị hàng.',
       'PENDING' when order.paymentMethod == 'BANK_QR' =>
         'Chờ xác nhận chuyển khoản trước khi chuẩn bị hàng.',
       'PENDING' => 'Cửa hàng sẽ xác nhận và chuẩn bị đơn của bạn.',

@@ -18,35 +18,47 @@ class AdminShell extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Scaffold(
     body: child,
-    bottomNavigationBar: NavigationBar(
-      backgroundColor: Colors.white,
-      indicatorColor: PawmartColors.greenPale,
-      labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
-      selectedIndex: _index,
-      onDestinationSelected: (index) => context.go(switch (index) {
-        0 => '/admin/overview',
-        1 => '/admin/products',
-        2 => '/admin/orders',
-        _ => '/admin/more',
-      }),
-      destinations: const [
-        NavigationDestination(
-          icon: Icon(Icons.dashboard_outlined),
-          selectedIcon: Icon(Icons.dashboard, color: PawmartColors.green),
-          label: 'Tổng quan',
-        ),
-        NavigationDestination(
-          icon: Icon(Icons.inventory_2_outlined),
-          selectedIcon: Icon(Icons.inventory_2, color: PawmartColors.green),
-          label: 'Sản phẩm',
-        ),
-        NavigationDestination(
-          icon: Icon(Icons.receipt_long_outlined),
-          selectedIcon: Icon(Icons.receipt_long, color: PawmartColors.green),
-          label: 'Đơn hàng',
-        ),
-        NavigationDestination(icon: Icon(Icons.tune), label: 'Quản lý'),
-      ],
+    bottomNavigationBar: Container(
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        border: Border(top: BorderSide(color: PawmartColors.line)),
+      ),
+      child: NavigationBar(
+        height: 72,
+        backgroundColor: Colors.white,
+        elevation: 0,
+        indicatorColor: PawmartColors.greenPale,
+        labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
+        selectedIndex: _index,
+        onDestinationSelected: (index) => context.go(switch (index) {
+          0 => '/admin/overview',
+          1 => '/admin/products',
+          2 => '/admin/orders',
+          _ => '/admin/more',
+        }),
+        destinations: const [
+          NavigationDestination(
+            icon: Icon(Icons.dashboard_outlined),
+            selectedIcon: Icon(Icons.dashboard, color: PawmartColors.green),
+            label: 'Tổng quan',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.inventory_2_outlined),
+            selectedIcon: Icon(Icons.inventory_2, color: PawmartColors.green),
+            label: 'Sản phẩm',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.receipt_long_outlined),
+            selectedIcon: Icon(Icons.receipt_long, color: PawmartColors.green),
+            label: 'Đơn hàng',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.tune_outlined),
+            selectedIcon: Icon(Icons.tune_rounded, color: PawmartColors.green),
+            label: 'Quản lý',
+          ),
+        ],
+      ),
     ),
   );
 }

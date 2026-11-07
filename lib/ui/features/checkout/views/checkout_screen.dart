@@ -230,7 +230,7 @@ class _CheckoutBodyState extends State<_CheckoutBody> {
             if (model.selectedPaymentMethod == 'BANK_QR') ...[
               const SizedBox(height: 8),
               const Text(
-                'Sau khi đặt hàng, mã QR sẽ xuất hiện trong chi tiết đơn. Cửa hàng chỉ xác nhận thanh toán sau khi đối soát giao dịch ngân hàng.',
+                'Sau khi đặt hàng, mã QR sẽ xuất hiện trong chi tiết đơn. Trạng thái sẽ tự cập nhật khi hệ thống nhận và đối soát giao dịch ngân hàng.',
                 style: TextStyle(color: PawmartColors.muted, fontSize: 12),
               ),
             ],

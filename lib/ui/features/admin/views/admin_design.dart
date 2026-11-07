@@ -3,13 +3,13 @@ import 'package:flutter/material.dart';
 import '../../../core/app_theme.dart';
 
 abstract final class AdminPalette {
-  static const background = PawmartColors.cream;
+  static const background = Color(0xFFF4F6F3);
   static const forest = PawmartColors.greenDark;
   static const green = PawmartColors.green;
   static const softGreen = PawmartColors.greenPale;
   static const ink = PawmartColors.ink;
   static const secondary = PawmartColors.muted;
-  static const border = PawmartColors.line;
+  static const border = Color(0xFFE3E9E4);
   static const amber = PawmartColors.amber;
   static const softAmber = PawmartColors.amberPale;
   static const red = Color(0xFFB64949);
@@ -61,7 +61,7 @@ class AdminSurface extends StatelessWidget {
     decoration: BoxDecoration(
       color: Colors.white,
       border: Border.all(color: AdminPalette.border),
-      borderRadius: BorderRadius.circular(20),
+      borderRadius: BorderRadius.circular(16),
     ),
     child: child,
   );
@@ -226,19 +226,33 @@ class AdminPageHeader extends StatelessWidget {
   Widget build(BuildContext context) => Column(
     crossAxisAlignment: CrossAxisAlignment.start,
     children: [
+      const Text(
+        'PAWMART  /  QUẢN TRỊ',
+        style: TextStyle(
+          fontSize: 10,
+          fontWeight: FontWeight.w800,
+          letterSpacing: 1.35,
+          color: AdminPalette.green,
+        ),
+      ),
+      const SizedBox(height: 7),
       Text(
         title,
         style: const TextStyle(
-          fontSize: 26,
+          fontSize: 25,
           fontWeight: FontWeight.w800,
           letterSpacing: -0.8,
           color: AdminPalette.ink,
         ),
       ),
-      const SizedBox(height: 3),
+      const SizedBox(height: 5),
       Text(
         subtitle,
-        style: const TextStyle(fontSize: 13, color: AdminPalette.secondary),
+        style: const TextStyle(
+          fontSize: 13,
+          color: AdminPalette.secondary,
+          height: 1.4,
+        ),
       ),
     ],
   );

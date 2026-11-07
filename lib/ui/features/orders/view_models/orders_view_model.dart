@@ -44,6 +44,8 @@ class OrderDetailViewModel extends ChangeNotifier {
   bool isCancelling = false;
   bool isSubmittingReview = false;
   String? errorMessage;
+  bool _isRefreshingPayment = false;
+  bool _disposed = false;
 
   Future<void> load() async {
     isLoading = true;
@@ -70,6 +72,41 @@ class OrderDetailViewModel extends ChangeNotifier {
       isLoading = false;
       notifyListeners();
     }
+  }
+
+  Future<void> refreshPaymentStatus() async {
+    if (_isRefreshingPayment ||
+        _disposed ||
+        order?.paymentMethod != 'BANK_QR' ||
+        order?.status == 'CANCELLED' ||
+        order?.paymentStatus != 'PENDING') {
+      return;
+    }
+    _isRefreshingPayment = true;
+    try {
+      final latest = await _repository.detail(orderId);
+      if (_disposed) return;
+      BankQrInstructions? latestQr;
+      try {
+        latestQr = await _repository.bankQr(orderId);
+      } catch (_) {
+        // The order detail remains the source of truth when QR refresh fails.
+      }
+      if (_disposed) return;
+      order = latest;
+      if (latestQr != null) bankQr = latestQr;
+      notifyListeners();
+    } catch (_) {
+      // Keep the last known state; the next poll or pull-to-refresh can retry.
+    } finally {
+      _isRefreshingPayment = false;
+    }
+  }
+
+  @override
+  void dispose() {
+    _disposed = true;
+    super.dispose();
   }
 
   Future<bool> cancel() async {

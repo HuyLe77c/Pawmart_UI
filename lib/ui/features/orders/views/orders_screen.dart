@@ -124,9 +124,12 @@ class _OrderCard extends StatelessWidget {
   Widget build(BuildContext context) => Card(
     child: InkWell(
       borderRadius: BorderRadius.circular(18),
-      onTap: () => context.push(
-        '/customer/orders/${Uri.encodeComponent(order.orderId)}',
-      ),
+      onTap: () async {
+        await context.push(
+          '/customer/orders/${Uri.encodeComponent(order.orderId)}',
+        );
+        if (context.mounted) context.read<OrdersViewModel>().load();
+      },
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
@@ -153,6 +156,35 @@ class _OrderCard extends StatelessWidget {
                   .format(order.createdAt.toLocal()),
               style: const TextStyle(color: PawmartColors.muted, fontSize: 12),
             ),
+            if (order.paymentMethod == 'BANK_QR') ...[
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  Icon(
+                    order.paymentStatus == 'SUCCESS'
+                        ? Icons.verified_rounded
+                        : Icons.schedule_rounded,
+                    size: 16,
+                    color: order.paymentStatus == 'SUCCESS'
+                        ? PawmartColors.green
+                        : PawmartColors.muted,
+                  ),
+                  const SizedBox(width: 5),
+                  Text(
+                    order.paymentStatus == 'SUCCESS'
+                        ? 'Đã thanh toán'
+                        : 'Chờ thanh toán',
+                    style: TextStyle(
+                      color: order.paymentStatus == 'SUCCESS'
+                          ? PawmartColors.greenDark
+                          : PawmartColors.muted,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ],
+              ),
+            ],
             const Divider(height: 22),
             Row(
               children: [

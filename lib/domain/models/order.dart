@@ -23,6 +23,7 @@ class BankQrInstructions {
     required this.qrImageUrl,
     required this.paymentStatus,
     required this.orderStatus,
+    this.receivedAmount = 0,
   });
 
   final String orderId;
@@ -34,6 +35,7 @@ class BankQrInstructions {
   final String qrImageUrl;
   final String paymentStatus;
   final String orderStatus;
+  final double receivedAmount;
 
   factory BankQrInstructions.fromJson(Map<String, dynamic> json) =>
       BankQrInstructions(
@@ -46,6 +48,7 @@ class BankQrInstructions {
         qrImageUrl: json['qrImageUrl'] as String,
         paymentStatus: json['paymentStatus'] as String,
         orderStatus: json['orderStatus'] as String,
+        receivedAmount: (json['receivedAmount'] as num?)?.toDouble() ?? 0,
       );
 }
 

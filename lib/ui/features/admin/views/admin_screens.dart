@@ -3,7 +3,9 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
 import '../../../core/app_dependencies.dart';
@@ -17,6 +19,74 @@ import 'admin_design.dart';
 String _compactOrderId(Object? value) {
   final id = '$value';
   return id.length > 8 ? id.substring(0, 8).toUpperCase() : id.toUpperCase();
+}
+
+String? _adminOrderTime(Object? value) {
+  final date = DateTime.tryParse('$value');
+  if (date == null) return null;
+  return DateFormat('HH:mm · dd/MM/yyyy').format(date.toLocal());
+}
+
+class _AdminQuickAction extends StatelessWidget {
+  const _AdminQuickAction({
+    required this.icon,
+    required this.title,
+    required this.detail,
+    required this.onTap,
+  });
+  final IconData icon;
+  final String title;
+  final String detail;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) => InkWell(
+    onTap: onTap,
+    borderRadius: BorderRadius.circular(12),
+    child: Padding(
+      padding: const EdgeInsets.symmetric(vertical: 11),
+      child: Row(
+        children: [
+          Container(
+            width: 42,
+            height: 42,
+            decoration: BoxDecoration(
+              color: AdminPalette.softGreen,
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Icon(icon, color: AdminPalette.green, size: 21),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w700,
+                    color: AdminPalette.ink,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  detail,
+                  style: const TextStyle(
+                    fontSize: 12,
+                    color: AdminPalette.secondary,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const Icon(
+            Icons.chevron_right_rounded,
+            color: AdminPalette.secondary,
+          ),
+        ],
+      ),
+    ),
+  );
 }
 
 class AdminOverviewScreen extends StatefulWidget {
@@ -111,9 +181,42 @@ class _AdminOverviewScreenState extends State<AdminOverviewScreen> {
               children: [
                 const AdminPageHeader(
                   title: 'Tổng quan cửa hàng',
-                  subtitle: 'Doanh thu, đơn hàng và tồn kho hiện tại',
+                  subtitle: 'Theo dõi hoạt động và xử lý công việc hôm nay',
                 ),
                 const SizedBox(height: 20),
+                AdminSurface(
+                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'CÔNG VIỆC HÔM NAY',
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: 1.1,
+                          color: AdminPalette.secondary,
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      _AdminQuickAction(
+                        icon: Icons.pending_actions_rounded,
+                        title: 'Đơn đang chờ',
+                        detail:
+                            '${statuses.where((s) => '${s['status']}'.toUpperCase() == 'PENDING').fold<int>(0, (count, s) => count + ((s['count'] as num?)?.toInt() ?? 0))} đơn cần xác nhận',
+                        onTap: () => context.go('/admin/orders'),
+                      ),
+                      adminSeparator(),
+                      _AdminQuickAction(
+                        icon: Icons.inventory_2_outlined,
+                        title: 'Kiểm tra tồn kho',
+                        detail: '${lowStock.length} sản phẩm cần chú ý',
+                        onTap: () => context.go('/admin/products'),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 18),
                 Container(
                   padding: const EdgeInsets.all(20),
                   decoration: BoxDecoration(
@@ -422,12 +525,16 @@ class _AdminProductsScreenState extends State<AdminProductsScreen> {
             'pageSize': '20',
             if (search.isNotEmpty) 'search': search,
             if (selectedCategoryId != null) 'categoryId': '$selectedCategoryId',
-            if (selectedPetType != null) 'petType': selectedPetType!,
+            'petType': ?selectedPetType,
             if (selectedActive != null) 'active': '$selectedActive',
           },
         ),
         api.getJson('api/admin/categories'),
-        api.getJson('api/admin/products/summary'),
+        api
+            .getJson('api/admin/products/summary')
+            .catchError(
+              (Object _) => <String, dynamic>{'categories': <dynamic>[]},
+            ),
       ]);
       if (!mounted || revision != requestRevision) return;
       final response = values[0] as Map<String, dynamic>;
@@ -438,11 +545,13 @@ class _AdminProductsScreenState extends State<AdminProductsScreen> {
         summary = values[2] as Map<String, dynamic>;
       });
     } catch (e) {
-      if (mounted && revision == requestRevision)
+      if (mounted && revision == requestRevision) {
         setState(() => error = _error(e));
+      }
     } finally {
-      if (mounted && revision == requestRevision)
+      if (mounted && revision == requestRevision) {
         setState(() => loading = false);
+      }
     }
   }
 
@@ -515,6 +624,8 @@ class _AdminProductsScreenState extends State<AdminProductsScreen> {
     }
     final form = await showDialog<Map<String, dynamic>>(
       context: context,
+      useSafeArea: false,
+      barrierDismissible: false,
       builder: (context) =>
           _ProductForm(product: product, categories: categories),
     );
@@ -847,11 +958,11 @@ class _AdminProductsScreenState extends State<AdminProductsScreen> {
                           final lowThreshold =
                               p['lowStockThreshold'] as int? ?? 5;
                           return Padding(
-                            padding: const EdgeInsets.only(bottom: 8),
+                            padding: const EdgeInsets.only(bottom: 10),
                             child: Material(
                               color: Colors.white,
                               shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(14),
+                                borderRadius: BorderRadius.circular(16),
                                 side: const BorderSide(
                                   color: AdminPalette.border,
                                 ),
@@ -860,7 +971,7 @@ class _AdminProductsScreenState extends State<AdminProductsScreen> {
                               child: InkWell(
                                 onTap: () => edit(p),
                                 child: Padding(
-                                  padding: const EdgeInsets.all(10),
+                                  padding: const EdgeInsets.all(14),
                                   child: Column(
                                     children: [
                                       Row(
@@ -869,11 +980,11 @@ class _AdminProductsScreenState extends State<AdminProductsScreen> {
                                         children: [
                                           ClipRRect(
                                             borderRadius: BorderRadius.circular(
-                                              9,
+                                              12,
                                             ),
                                             child: SizedBox(
-                                              width: 64,
-                                              height: 64,
+                                              width: 72,
+                                              height: 72,
                                               child: imageNeedsReview
                                                   ? const ColoredBox(
                                                       color: AdminPalette
@@ -887,11 +998,11 @@ class _AdminProductsScreenState extends State<AdminProductsScreen> {
                                                     )
                                                   : ProductArtwork(
                                                       imageUrl: imageUrl,
-                                                      height: 64,
+                                                      height: 72,
                                                     ),
                                             ),
                                           ),
-                                          const SizedBox(width: 12),
+                                          const SizedBox(width: 14),
                                           Expanded(
                                             child: Column(
                                               crossAxisAlignment:
@@ -960,7 +1071,9 @@ class _AdminProductsScreenState extends State<AdminProductsScreen> {
                                                 ),
                                         ],
                                       ),
-                                      const SizedBox(height: 3),
+                                      const SizedBox(height: 12),
+                                      adminSeparator(),
+                                      const SizedBox(height: 8),
                                       Row(
                                         children: [
                                           AdminStatusPill(
@@ -1064,8 +1177,9 @@ class _AdminProductsScreenState extends State<AdminProductsScreen> {
           ),
   );
   void _snack(String text) {
-    if (mounted)
+    if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(text)));
+    }
   }
 }
 
@@ -1300,8 +1414,9 @@ class _ProductFormState extends State<_ProductForm> {
         widget.categories.first['categoryId'] as int;
     target = p?['targetPetType'] as String? ?? 'ALL';
     final images = p?['images'] as List<dynamic>? ?? [];
-    if (images.isNotEmpty)
+    if (images.isNotEmpty) {
       image.text = images.first['imageUrl'] as String? ?? '';
+    }
   }
 
   @override
@@ -1352,12 +1467,75 @@ class _ProductFormState extends State<_ProductForm> {
   }
 
   @override
-  Widget build(BuildContext context) => AlertDialog(
-    title: Text(widget.product == null ? 'Sản phẩm mới' : 'Sửa sản phẩm'),
-    content: SingleChildScrollView(
+  Widget build(BuildContext context) => Scaffold(
+    backgroundColor: AdminPalette.background,
+    appBar: AppBar(
+      title: Text(
+        widget.product == null ? 'Thêm sản phẩm' : 'Chỉnh sửa sản phẩm',
+      ),
+    ),
+    body: SingleChildScrollView(
+      padding: const EdgeInsets.fromLTRB(18, 20, 18, 32),
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,
         children: [
+          const AdminPageHeader(
+            title: 'Thông tin hàng hóa',
+            subtitle: 'Cập nhật nội dung hiển thị trên cửa hàng',
+          ),
+          const SizedBox(height: 20),
+          if (widget.product case final product?) ...[
+            AdminSurface(
+              padding: const EdgeInsets.all(12),
+              child: Row(
+                children: [
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(12),
+                    child: SizedBox(
+                      width: 64,
+                      height: 64,
+                      child: ProductArtwork(
+                        imageUrl:
+                            ((product['images'] as List<dynamic>?)?.firstOrNull
+                                    as Map?)?['imageUrl']
+                                as String?,
+                        height: 64,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          '${product['productName']}',
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            fontWeight: FontWeight.w800,
+                            color: AdminPalette.ink,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          'SKU ${product['sku'] ?? '—'} · Tồn ${product['stockQuantity'] ?? 0}',
+                          style: const TextStyle(
+                            fontSize: 12,
+                            color: AdminPalette.secondary,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 20),
+          ],
+          const _AdminFormSection('THÔNG TIN CƠ BẢN'),
+          const SizedBox(height: 10),
           TextField(
             controller: name,
             decoration: const InputDecoration(labelText: 'Tên sản phẩm'),
@@ -1380,32 +1558,60 @@ class _ProductFormState extends State<_ProductForm> {
               labelText: 'Giai đoạn sống phù hợp',
             ),
           ),
-          TextField(
-            controller: description,
-            maxLines: 3,
-            decoration: const InputDecoration(labelText: 'Mô tả sản phẩm'),
-          ),
-          TextField(
-            controller: ingredients,
-            maxLines: 3,
-            decoration: const InputDecoration(
-              labelText: 'Thành phần theo nhãn',
+          const SizedBox(height: 18),
+          AdminSurface(
+            padding: EdgeInsets.zero,
+            child: ExpansionTile(
+              maintainState: true,
+              shape: const Border(),
+              collapsedShape: const Border(),
+              title: const Text(
+                'Mô tả & nội dung',
+                style: TextStyle(
+                  fontWeight: FontWeight.w800,
+                  color: AdminPalette.ink,
+                ),
+              ),
+              subtitle: const Text(
+                'Thành phần, dinh dưỡng và cách dùng',
+                style: TextStyle(fontSize: 12, color: AdminPalette.secondary),
+              ),
+              childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+              children: [
+                TextField(
+                  controller: description,
+                  maxLines: 3,
+                  decoration: const InputDecoration(
+                    labelText: 'Mô tả sản phẩm',
+                  ),
+                ),
+                TextField(
+                  controller: ingredients,
+                  maxLines: 3,
+                  decoration: const InputDecoration(
+                    labelText: 'Thành phần theo nhãn',
+                  ),
+                ),
+                TextField(
+                  controller: nutritionInfo,
+                  maxLines: 3,
+                  decoration: const InputDecoration(
+                    labelText: 'Dinh dưỡng theo nhãn',
+                  ),
+                ),
+                TextField(
+                  controller: feedingGuide,
+                  maxLines: 3,
+                  decoration: const InputDecoration(
+                    labelText: 'Hướng dẫn sử dụng theo nhãn',
+                  ),
+                ),
+              ],
             ),
           ),
-          TextField(
-            controller: nutritionInfo,
-            maxLines: 3,
-            decoration: const InputDecoration(
-              labelText: 'Dinh dưỡng theo nhãn',
-            ),
-          ),
-          TextField(
-            controller: feedingGuide,
-            maxLines: 3,
-            decoration: const InputDecoration(
-              labelText: 'Hướng dẫn sử dụng theo nhãn',
-            ),
-          ),
+          const SizedBox(height: 18),
+          const _AdminFormSection('PHÂN LOẠI & BÁN HÀNG'),
+          const SizedBox(height: 10),
           DropdownButtonFormField<int>(
             initialValue: categoryId,
             decoration: const InputDecoration(labelText: 'Danh mục'),
@@ -1432,14 +1638,24 @@ class _ProductFormState extends State<_ProductForm> {
           DropdownButtonFormField<String>(
             initialValue: target,
             decoration: const InputDecoration(labelText: 'Phù hợp với'),
-            items: const [
-              'ALL',
-              'DOG',
-              'CAT',
-              'OTHER',
-            ].map((e) => DropdownMenuItem(value: e, child: Text(e))).toList(),
+            items: const ['ALL', 'DOG', 'CAT', 'OTHER']
+                .map(
+                  (e) => DropdownMenuItem(
+                    value: e,
+                    child: Text(switch (e) {
+                      'DOG' => 'Chó',
+                      'CAT' => 'Mèo',
+                      'OTHER' => 'Thú cưng khác',
+                      _ => 'Mọi loại',
+                    }),
+                  ),
+                )
+                .toList(),
             onChanged: (v) => setState(() => target = v ?? 'ALL'),
           ),
+          const SizedBox(height: 18),
+          const _AdminFormSection('HÌNH ẢNH'),
+          const SizedBox(height: 10),
           TextField(
             controller: image,
             decoration: const InputDecoration(labelText: 'URL ảnh (tùy chọn)'),
@@ -1493,77 +1709,102 @@ class _ProductFormState extends State<_ProductForm> {
         ],
       ),
     ),
-    actions: [
-      TextButton(
-        onPressed: () => Navigator.pop(context),
-        child: const Text('Hủy'),
+    bottomNavigationBar: SafeArea(
+      top: false,
+      child: Container(
+        padding: const EdgeInsets.fromLTRB(18, 12, 18, 12),
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          border: Border(top: BorderSide(color: AdminPalette.border)),
+        ),
+        child: FilledButton.icon(
+          icon: const Icon(Icons.save_outlined),
+          onPressed: () {
+            final cost = double.tryParse(price.text);
+            final quantity = int.tryParse(stock.text);
+            if (name.text.trim().length < 2 ||
+                cost == null ||
+                cost <= 0 ||
+                quantity == null ||
+                quantity < 0 ||
+                categoryId == null) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text(
+                    'Nhập tên, giá lớn hơn 0, tồn kho không âm và danh mục.',
+                  ),
+                ),
+              );
+              return;
+            }
+            Navigator.pop(context, {
+              'productName': name.text.trim(),
+              'brand': brand.text.trim().isEmpty ? null : brand.text.trim(),
+              'categoryId': categoryId,
+              'price': cost,
+              'stockQuantity': quantity,
+              'lowStockThreshold': widget.product?['lowStockThreshold'] ?? 5,
+              'targetPetType': target,
+              'isFeatured': widget.product?['isFeatured'] ?? false,
+              'description': description.text.trim().isEmpty
+                  ? null
+                  : description.text.trim(),
+              'ingredients': ingredients.text.trim().isEmpty
+                  ? null
+                  : ingredients.text.trim(),
+              'nutritionInfo': nutritionInfo.text.trim().isEmpty
+                  ? null
+                  : nutritionInfo.text.trim(),
+              'packageSize': packageSize.text.trim().isEmpty
+                  ? null
+                  : packageSize.text.trim(),
+              'lifeStage': lifeStage.text.trim().isEmpty
+                  ? null
+                  : lifeStage.text.trim(),
+              'feedingGuide': feedingGuide.text.trim().isEmpty
+                  ? null
+                  : feedingGuide.text.trim(),
+              'sku': widget.product?['sku'],
+              'images':
+                  widget.product != null &&
+                      image.text.trim() ==
+                          ((widget.product!['images'] as List<dynamic>?)
+                                      ?.firstOrNull?['imageUrl']
+                                  as String? ??
+                              '')
+                  ? widget.product!['images']
+                  : image.text.trim().isEmpty
+                  ? []
+                  : [
+                      {
+                        'imageUrl': image.text.trim(),
+                        'isPrimary': true,
+                        'displayOrder': 0,
+                      },
+                    ],
+              '_selectedImage': selectedImage,
+            });
+          },
+          label: const Text('Lưu sản phẩm'),
+        ),
       ),
-      FilledButton(
-        onPressed: () {
-          final cost = double.tryParse(price.text);
-          final quantity = int.tryParse(stock.text);
-          if (name.text.trim().length < 2 ||
-              cost == null ||
-              quantity == null ||
-              categoryId == null) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('Kiểm tra tên, giá, tồn kho và danh mục.'),
-              ),
-            );
-            return;
-          }
-          Navigator.pop(context, {
-            'productName': name.text.trim(),
-            'brand': brand.text.trim().isEmpty ? null : brand.text.trim(),
-            'categoryId': categoryId,
-            'price': cost,
-            'stockQuantity': quantity,
-            'lowStockThreshold': widget.product?['lowStockThreshold'] ?? 5,
-            'targetPetType': target,
-            'isFeatured': widget.product?['isFeatured'] ?? false,
-            'description': description.text.trim().isEmpty
-                ? null
-                : description.text.trim(),
-            'ingredients': ingredients.text.trim().isEmpty
-                ? null
-                : ingredients.text.trim(),
-            'nutritionInfo': nutritionInfo.text.trim().isEmpty
-                ? null
-                : nutritionInfo.text.trim(),
-            'packageSize': packageSize.text.trim().isEmpty
-                ? null
-                : packageSize.text.trim(),
-            'lifeStage': lifeStage.text.trim().isEmpty
-                ? null
-                : lifeStage.text.trim(),
-            'feedingGuide': feedingGuide.text.trim().isEmpty
-                ? null
-                : feedingGuide.text.trim(),
-            'sku': widget.product?['sku'],
-            'images':
-                widget.product != null &&
-                    image.text.trim() ==
-                        ((widget.product!['images'] as List<dynamic>?)
-                                    ?.firstOrNull?['imageUrl']
-                                as String? ??
-                            '')
-                ? widget.product!['images']
-                : image.text.trim().isEmpty
-                ? []
-                : [
-                    {
-                      'imageUrl': image.text.trim(),
-                      'isPrimary': true,
-                      'displayOrder': 0,
-                    },
-                  ],
-            '_selectedImage': selectedImage,
-          });
-        },
-        child: const Text('Lưu'),
-      ),
-    ],
+    ),
+  );
+}
+
+class _AdminFormSection extends StatelessWidget {
+  const _AdminFormSection(this.label);
+  final String label;
+
+  @override
+  Widget build(BuildContext context) => Text(
+    label,
+    style: const TextStyle(
+      fontSize: 11,
+      fontWeight: FontWeight.w800,
+      letterSpacing: 1.1,
+      color: AdminPalette.green,
+    ),
   );
 }
 
@@ -1578,6 +1819,9 @@ class _AdminOrdersScreenState extends State<AdminOrdersScreen> {
   String? error;
   List<dynamic> items = [];
   String status = 'ALL';
+  int page = 1;
+  int total = 0;
+  int requestRevision = 0;
   @override
   void initState() {
     super.initState();
@@ -1585,6 +1829,7 @@ class _AdminOrdersScreenState extends State<AdminOrdersScreen> {
   }
 
   Future<void> load() async {
+    final revision = ++requestRevision;
     setState(() {
       loading = true;
       error = null;
@@ -1593,21 +1838,29 @@ class _AdminOrdersScreenState extends State<AdminOrdersScreen> {
       final result = await context.read<AppDependencies>().apiClient.getJson(
         'api/admin/orders',
         query: {
-          'page': '1',
-          'pageSize': '50',
+          'page': '$page',
+          'pageSize': '20',
           if (status != 'ALL') 'status': status,
         },
       ) as Map<String, dynamic>;
-      if (mounted)
-        setState(() => items = result['items'] as List<dynamic>? ?? []);
+      if (!mounted || revision != requestRevision) return;
+      setState(() {
+        items = result['items'] as List<dynamic>? ?? [];
+        total = result['totalItems'] as int? ?? 0;
+      });
     } catch (e) {
-      if (mounted) setState(() => error = _error(e));
+      if (mounted && revision == requestRevision) {
+        setState(() => error = _error(e));
+      }
     } finally {
-      if (mounted) setState(() => loading = false);
+      if (mounted && revision == requestRevision) {
+        setState(() => loading = false);
+      }
     }
   }
 
   Future<void> move(Map<String, dynamic> order) async {
+    final api = context.read<AppDependencies>().apiClient;
     final choices = switch (order['status']) {
       'PENDING' => ['CONFIRMED', 'CANCELLED'],
       'CONFIRMED' => ['SHIPPING', 'CANCELLED'],
@@ -1632,30 +1885,28 @@ class _AdminOrdersScreenState extends State<AdminOrdersScreen> {
                 ),
               ),
             ),
-            ...choices
-                .map(
-                  (s) => ListTile(
-                    title: AdminStatusPill(s),
-                    trailing: const Icon(Icons.chevron_right),
-                    onTap: () => Navigator.pop(context, s),
-                  ),
-                )
-                .toList(),
+            ...choices.map(
+              (s) => ListTile(
+                title: AdminStatusPill(s),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: () => Navigator.pop(context, s),
+              ),
+            ),
           ],
         ),
       ),
     );
     if (next == null) return;
     try {
-      await context.read<AppDependencies>().apiClient.putJson(
-        'api/admin/orders/${order['orderId']}/status',
-        {'status': next},
-      );
+      await api.putJson('api/admin/orders/${order['orderId']}/status', {
+        'status': next,
+      });
       await load();
     } catch (e) {
-      if (mounted)
+      if (mounted) {
         ScaffoldMessenger.of(context)
             .showSnackBar(SnackBar(content: Text(_error(e))));
+      }
     }
   }
 
@@ -1675,9 +1926,10 @@ class _AdminOrdersScreenState extends State<AdminOrdersScreen> {
       if (change == 'STATUS' && mounted) await move(order);
       if (change == 'PAYMENT' && mounted) await confirmPayment(detail);
     } catch (e) {
-      if (mounted)
+      if (mounted) {
         ScaffoldMessenger.of(context)
             .showSnackBar(SnackBar(content: Text(_error(e))));
+      }
     }
   }
 
@@ -1757,14 +2009,16 @@ class _AdminOrdersScreenState extends State<AdminOrdersScreen> {
         },
       );
       await load();
-      if (mounted)
+      if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Đã ghi nhận thanh toán sau đối soát.')),
         );
+      }
     } catch (error) {
-      if (mounted)
+      if (mounted) {
         ScaffoldMessenger.of(context)
             .showSnackBar(SnackBar(content: Text(_error(error))));
+      }
     }
   }
 
@@ -1822,13 +2076,40 @@ class _AdminOrdersScreenState extends State<AdminOrdersScreen> {
                           }),
                           selected: status == s,
                           onSelected: (_) {
-                            setState(() => status = s);
+                            setState(() {
+                              status = s;
+                              page = 1;
+                            });
                             load();
                           },
                         ),
                       ),
                     )
                     .toList(),
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(18, 0, 18, 12),
+          child: Row(
+            children: [
+              Text(
+                loading ? 'Đang tải đơn…' : '$total đơn hàng',
+                style: const TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                  color: AdminPalette.ink,
+                ),
+              ),
+              const Spacer(),
+              if (total > 20)
+                Text(
+                  'Trang $page / ${(total / 20).ceil()}',
+                  style: const TextStyle(
+                    fontSize: 12,
+                    color: AdminPalette.secondary,
+                  ),
+                ),
+            ],
           ),
         ),
         Expanded(
@@ -1855,6 +2136,7 @@ class _AdminOrdersScreenState extends State<AdminOrdersScreen> {
                   itemCount: items.length,
                   itemBuilder: (context, i) {
                     final o = Map<String, dynamic>.from(items[i] as Map);
+                    final createdAt = _adminOrderTime(o['createdAt']);
                     return Padding(
                       padding: const EdgeInsets.only(bottom: 10),
                       child: AdminSurface(
@@ -1885,9 +2167,19 @@ class _AdminOrdersScreenState extends State<AdminOrdersScreen> {
                                     AdminStatusPill('${o['status']}'),
                                   ],
                                 ),
+                                if (createdAt != null) ...[
+                                  const SizedBox(height: 5),
+                                  Text(
+                                    createdAt,
+                                    style: const TextStyle(
+                                      fontSize: 12,
+                                      color: AdminPalette.secondary,
+                                    ),
+                                  ),
+                                ],
                                 const SizedBox(height: 14),
                                 adminSeparator(),
-                                const SizedBox(height: 13),
+                                const SizedBox(height: 12),
                                 Row(
                                   children: [
                                     const Icon(
@@ -1896,43 +2188,47 @@ class _AdminOrdersScreenState extends State<AdminOrdersScreen> {
                                       color: AdminPalette.secondary,
                                     ),
                                     const SizedBox(width: 7),
-                                    Text(
-                                      '${o['paymentMethod'] == 'BANK_QR'
-                                          ? 'QR chuyển khoản'
-                                          : o['paymentMethod'] == 'COD'
-                                          ? 'COD'
-                                          : o['paymentMethod']} · ${o['paymentStatus'] == 'SUCCESS' ? 'Đã thu' : 'Chờ tiền'}',
-                                      style: const TextStyle(
-                                        fontSize: 12,
-                                        color: AdminPalette.secondary,
-                                      ),
-                                    ),
-                                    const Spacer(),
-                                    Text(
-                                      formatVnd(o['total'] as num),
-                                      style: const TextStyle(
-                                        fontSize: 16,
-                                        fontWeight: FontWeight.w800,
-                                        color: AdminPalette.forest,
+                                    Expanded(
+                                      child: Text(
+                                        '${o['paymentMethod'] == 'BANK_QR'
+                                            ? 'QR chuyển khoản'
+                                            : o['paymentMethod'] == 'COD'
+                                            ? 'COD'
+                                            : o['paymentMethod']} · ${o['paymentStatus'] == 'SUCCESS' ? 'Đã thu' : 'Chờ tiền'}',
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: const TextStyle(
+                                          fontSize: 12,
+                                          color: AdminPalette.secondary,
+                                        ),
                                       ),
                                     ),
                                   ],
                                 ),
-                                const SizedBox(height: 11),
-                                const Row(
+                                const SizedBox(height: 13),
+                                Row(
                                   children: [
                                     Text(
-                                      'Xem chi tiết và cập nhật',
+                                      formatVnd(o['total'] as num),
+                                      style: const TextStyle(
+                                        fontSize: 18,
+                                        fontWeight: FontWeight.w800,
+                                        color: AdminPalette.forest,
+                                      ),
+                                    ),
+                                    const Spacer(),
+                                    const Text(
+                                      'Xem chi tiết',
                                       style: TextStyle(
                                         fontSize: 12,
                                         fontWeight: FontWeight.w700,
                                         color: AdminPalette.green,
                                       ),
                                     ),
-                                    SizedBox(width: 4),
-                                    Icon(
-                                      Icons.arrow_forward,
-                                      size: 14,
+                                    const SizedBox(width: 2),
+                                    const Icon(
+                                      Icons.arrow_forward_rounded,
+                                      size: 16,
                                       color: AdminPalette.green,
                                     ),
                                   ],
@@ -1946,6 +2242,38 @@ class _AdminOrdersScreenState extends State<AdminOrdersScreen> {
                   },
                 ),
         ),
+        if (total > 20 && !loading && error == null)
+          SafeArea(
+            top: false,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 6),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  TextButton.icon(
+                    onPressed: page > 1
+                        ? () {
+                            setState(() => page--);
+                            load();
+                          }
+                        : null,
+                    icon: const Icon(Icons.chevron_left_rounded),
+                    label: const Text('Trước'),
+                  ),
+                  TextButton.icon(
+                    onPressed: page * 20 < total
+                        ? () {
+                            setState(() => page++);
+                            load();
+                          }
+                        : null,
+                    icon: const Icon(Icons.chevron_right_rounded),
+                    label: const Text('Tiếp'),
+                  ),
+                ],
+              ),
+            ),
+          ),
       ],
     ),
   );
@@ -1961,8 +2289,10 @@ class _AdminMoreScreenState extends State<AdminMoreScreen>
     with SingleTickerProviderStateMixin {
   late final TabController tabs = TabController(length: 4, vsync: this);
   final Map<int, List<dynamic>> data = {};
+  final Map<int, int> categoryCounts = {};
   bool loading = true;
   String? error;
+  int requestRevision = 0;
   final endpoints = const [
     'api/admin/categories',
     'api/promotions/admin',
@@ -1981,25 +2311,46 @@ class _AdminMoreScreenState extends State<AdminMoreScreen>
   }
 
   Future<void> load() async {
+    final revision = ++requestRevision;
     setState(() {
       loading = true;
       error = null;
     });
     try {
       final api = context.read<AppDependencies>().apiClient;
-      for (var i = 0; i < endpoints.length; i++) {
-        final r = await api.getJson(
-          endpoints[i],
-          query: i == 1 ? {'page': '1', 'pageSize': '50'} : null,
-        );
-        data[i] = r is Map<String, dynamic>
-            ? (r['items'] as List<dynamic>? ?? [])
-            : r as List<dynamic>;
-      }
+      final results = await Future.wait([
+        api.getJson(endpoints[0]),
+        api.getJson(endpoints[1], query: {'page': '1', 'pageSize': '50'}),
+        api.getJson(endpoints[2]),
+        api.getJson('api/admin/products/summary'),
+      ]);
+      if (!mounted || revision != requestRevision) return;
+      setState(() {
+        for (var i = 0; i < endpoints.length; i++) {
+          final result = results[i];
+          data[i] = result is Map<String, dynamic>
+              ? (result['items'] as List<dynamic>? ?? [])
+              : result as List<dynamic>;
+        }
+        categoryCounts.clear();
+        final counts =
+            (results[3] as Map<String, dynamic>)['categories']
+                as List<dynamic>? ??
+            [];
+        for (final raw in counts) {
+          final row = raw as Map;
+          final id = row['categoryId'] as int?;
+          if (id != null) categoryCounts[id] = row['total'] as int? ?? 0;
+        }
+      });
     } catch (e) {
-      error = _error(e);
+      if (mounted && revision == requestRevision) {
+        setState(() => error = _error(e));
+      }
     } finally {
-      if (mounted) setState(() => loading = false);
+      if (mounted && revision == requestRevision) {
+        setState(() => loading = false);
+      }
     }
   }
 
@@ -2022,9 +2373,10 @@ class _AdminMoreScreenState extends State<AdminMoreScreen>
       );
       await load();
     } catch (e) {
-      if (mounted)
+      if (mounted) {
         ScaffoldMessenger.of(context)
             .showSnackBar(SnackBar(content: Text(_error(e))));
+      }
     }
   }
 
@@ -2034,7 +2386,7 @@ class _AdminMoreScreenState extends State<AdminMoreScreen>
       context: context,
       builder: (context) => _SimpleAdminForm(kind: tab, existing: existing),
     );
-    if (result == null) return;
+    if (result == null || !mounted) return;
     final base = switch (tab) {
       0 => 'api/categories',
       1 => 'api/promotions',
@@ -2055,9 +2407,10 @@ class _AdminMoreScreenState extends State<AdminMoreScreen>
       }
       await load();
     } catch (e) {
-      if (mounted)
+      if (mounted) {
         ScaffoldMessenger.of(context)
             .showSnackBar(SnackBar(content: Text(_error(e))));
+      }
     }
   }
 
@@ -2082,16 +2435,18 @@ class _AdminMoreScreenState extends State<AdminMoreScreen>
         ),
       );
     } on ApiException catch (e) {
-      if (mounted)
+      if (mounted) {
         ScaffoldMessenger.of(context)
             .showSnackBar(SnackBar(content: Text(e.userMessage)));
+      }
     } catch (_) {
-      if (mounted)
+      if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Không gửi được thông báo. Hãy thử lại.'),
           ),
         );
+      }
     }
   }
 
@@ -2171,7 +2526,7 @@ class _AdminMoreScreenState extends State<AdminMoreScreen>
                       padding: const EdgeInsets.fromLTRB(18, 0, 18, 96),
                       itemCount: rows.isEmpty ? 2 : rows.length + 1,
                       itemBuilder: (context, i) {
-                        if (i == 0)
+                        if (i == 0) {
                           return Padding(
                             padding: const EdgeInsets.only(bottom: 12),
                             child: Row(
@@ -2193,7 +2548,8 @@ class _AdminMoreScreenState extends State<AdminMoreScreen>
                               ],
                             ),
                           );
-                        if (rows.isEmpty)
+                        }
+                        if (rows.isEmpty) {
                           return AdminEmptyPanel(
                             title: 'Chưa có $label',
                             message: 'Nhấn Thêm để tạo $label đầu tiên.',
@@ -2203,6 +2559,7 @@ class _AdminMoreScreenState extends State<AdminMoreScreen>
                                 ? Icons.local_offer_outlined
                                 : Icons.store_outlined,
                           );
+                        }
                         final r = Map<String, dynamic>.from(rows[i - 1] as Map);
                         final title =
                             r[switch (tab) {
@@ -2213,7 +2570,7 @@ class _AdminMoreScreenState extends State<AdminMoreScreen>
                         final desc = tab == 1
                             ? '${r['code']} · ${r['discountType']} ${r['discountValue']}'
                             : tab == 2
-                            ? '${r['storeType']} · ${r['address']}'
+                            ? '${r['storeType'] == 'WAREHOUSE' ? 'Kho hàng' : 'Cửa hàng'} · ${r['address']}'
                             : '${r['description'] ?? ''}';
                         return Padding(
                           padding: const EdgeInsets.only(bottom: 10),
@@ -2260,7 +2617,7 @@ class _AdminMoreScreenState extends State<AdminMoreScreen>
                                           ),
                                           const SizedBox(height: 3),
                                           Text(
-                                            '$desc',
+                                            desc,
                                             maxLines: 2,
                                             overflow: TextOverflow.ellipsis,
                                             style: const TextStyle(
@@ -2269,10 +2626,27 @@ class _AdminMoreScreenState extends State<AdminMoreScreen>
                                             ),
                                           ),
                                           const SizedBox(height: 7),
-                                          AdminStatusPill(
-                                            r['isActive'] == true
-                                                ? 'ACTIVE'
-                                                : 'INACTIVE',
+                                          Wrap(
+                                            spacing: 8,
+                                            runSpacing: 6,
+                                            crossAxisAlignment:
+                                                WrapCrossAlignment.center,
+                                            children: [
+                                              AdminStatusPill(
+                                                r['isActive'] == true
+                                                    ? 'ACTIVE'
+                                                    : 'INACTIVE',
+                                              ),
+                                              if (tab == 0)
+                                                Text(
+                                                  '${categoryCounts[r['categoryId'] as int] ?? 0} sản phẩm',
+                                                  style: const TextStyle(
+                                                    fontSize: 11,
+                                                    color:
+                                                        AdminPalette.secondary,
+                                                  ),
+                                                ),
+                                            ],
                                           ),
                                         ],
                                       ),
@@ -2318,6 +2692,7 @@ class _AdminReviewsPanel extends StatefulWidget {
 class _AdminReviewsPanelState extends State<_AdminReviewsPanel> {
   int page = 1;
   int total = 0;
+  int requestRevision = 0;
   bool loading = true;
   String? error;
   List<dynamic> reviews = const [];
@@ -2329,6 +2704,7 @@ class _AdminReviewsPanelState extends State<_AdminReviewsPanel> {
   }
 
   Future<void> load() async {
+    final revision = ++requestRevision;
     setState(() {
       loading = true;
       error = null;
@@ -2338,15 +2714,19 @@ class _AdminReviewsPanelState extends State<_AdminReviewsPanel> {
         'api/admin/reviews',
         query: {'page': '$page', 'pageSize': '20'},
       ) as Map<String, dynamic>;
-      if (!mounted) return;
+      if (!mounted || revision != requestRevision) return;
       setState(() {
         reviews = result['items'] as List<dynamic>? ?? const [];
         total = result['totalItems'] as int? ?? 0;
       });
     } catch (cause) {
-      if (mounted) setState(() => error = _error(cause));
+      if (mounted && revision == requestRevision) {
+        setState(() => error = _error(cause));
+      }
     } finally {
-      if (mounted) setState(() => loading = false);
+      if (mounted && revision == requestRevision) {
+        setState(() => loading = false);
+      }
     }
   }
 
@@ -2388,9 +2768,10 @@ class _AdminReviewsPanelState extends State<_AdminReviewsPanel> {
       );
       await load();
     } catch (cause) {
-      if (mounted)
+      if (mounted) {
         ScaffoldMessenger.of(context)
             .showSnackBar(SnackBar(content: Text(_error(cause))));
+      }
     }
   }
 
@@ -2402,9 +2783,10 @@ class _AdminReviewsPanelState extends State<_AdminReviewsPanel> {
       );
       await load();
     } catch (cause) {
-      if (mounted)
+      if (mounted) {
         ScaffoldMessenger.of(context)
             .showSnackBar(SnackBar(content: Text(_error(cause))));
+      }
     }
   }
 
@@ -2785,6 +3167,12 @@ class _SimpleAdminFormState extends State<_SimpleAdminForm> {
       d = TextEditingController(),
       e = TextEditingController();
   String type = 'STORE', discount = 'PERCENT';
+
+  void _invalid(String message) {
+    ScaffoldMessenger.of(context)
+        .showSnackBar(SnackBar(content: Text(message)));
+  }
+
   @override
   void initState() {
     super.initState();
@@ -2863,8 +3251,20 @@ class _SimpleAdminFormState extends State<_SimpleAdminForm> {
                   DropdownButtonFormField<String>(
                     initialValue: discount,
                     items: const ['PERCENT', 'FIXED']
-                        .map((v) => DropdownMenuItem(value: v, child: Text(v)))
+                        .map(
+                          (v) => DropdownMenuItem(
+                            value: v,
+                            child: Text(
+                              v == 'PERCENT'
+                                  ? 'Theo phần trăm'
+                                  : 'Số tiền cố định',
+                            ),
+                          ),
+                        )
                         .toList(),
+                    decoration: const InputDecoration(
+                      labelText: 'Hình thức giảm',
+                    ),
                     onChanged: (v) => setState(() => discount = v ?? 'PERCENT'),
                   ),
                   TextField(
@@ -2890,8 +3290,16 @@ class _SimpleAdminFormState extends State<_SimpleAdminForm> {
                   DropdownButtonFormField<String>(
                     initialValue: type,
                     items: const ['STORE', 'WAREHOUSE']
-                        .map((v) => DropdownMenuItem(value: v, child: Text(v)))
+                        .map(
+                          (v) => DropdownMenuItem(
+                            value: v,
+                            child: Text(v == 'STORE' ? 'Cửa hàng' : 'Kho hàng'),
+                          ),
+                        )
                         .toList(),
+                    decoration: const InputDecoration(
+                      labelText: 'Loại điểm bán',
+                    ),
                     onChanged: (v) => setState(() => type = v ?? 'STORE'),
                   ),
                   TextField(
@@ -2934,7 +3342,10 @@ class _SimpleAdminFormState extends State<_SimpleAdminForm> {
             final now = DateTime.now().toUtc();
             Map<String, dynamic> request;
             if (kind == 0) {
-              if (a.text.trim().length < 2) return;
+              if (a.text.trim().length < 2) {
+                _invalid('Tên danh mục cần ít nhất 2 ký tự.');
+                return;
+              }
               request = {
                 'categoryName': a.text.trim(),
                 'description': b.text.trim(),
@@ -2945,8 +3356,12 @@ class _SimpleAdminFormState extends State<_SimpleAdminForm> {
               final val = double.tryParse(c.text);
               if (a.text.trim().length < 3 ||
                   b.text.trim().length < 2 ||
-                  val == null)
+                  val == null ||
+                  val <= 0 ||
+                  (discount == 'PERCENT' && val > 100)) {
+                _invalid('Kiểm tra mã, tên và giá trị giảm giá.');
                 return;
+              }
               request = {
                 'code': a.text.trim(),
                 'promotionName': b.text.trim(),
@@ -2967,8 +3382,14 @@ class _SimpleAdminFormState extends State<_SimpleAdminForm> {
               if (a.text.trim().length < 2 ||
                   b.text.trim().length < 5 ||
                   lat == null ||
-                  lon == null)
+                  lon == null ||
+                  lat < -90 ||
+                  lat > 90 ||
+                  lon < -180 ||
+                  lon > 180) {
+                _invalid('Nhập tên, địa chỉ và tọa độ hợp lệ.');
                 return;
+              }
               request = {
                 'storeName': a.text.trim(),
                 'storeType': type,
