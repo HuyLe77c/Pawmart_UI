@@ -32,13 +32,18 @@ class _SignInScreenState extends State<SignInScreen> {
     await auth.signIn(_email.text, _password.text);
   }
 
+  Future<void> _googleSignIn() async {
+    FocusScope.of(context).unfocus();
+    await context.read<AuthViewModel>().signInWithGoogle();
+  }
+
   @override
   Widget build(BuildContext context) => Scaffold(
     body: SafeArea(
       child: Align(
         alignment: Alignment.topCenter,
         child: SingleChildScrollView(
-          padding: const EdgeInsets.fromLTRB(24, 64, 24, 24),
+          padding: const EdgeInsets.fromLTRB(24, 40, 24, 32),
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 440),
             child: Consumer<AuthViewModel>(
@@ -48,9 +53,9 @@ class _SignInScreenState extends State<SignInScreen> {
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     const _BrandMark(),
-                    const SizedBox(height: 32),
+                    const SizedBox(height: 36),
                     Text(
-                      'Chào mừng trở lại.',
+                      'Mừng bạn trở lại',
                       style: Theme.of(context).textTheme.headlineMedium
                           ?.copyWith(
                             fontWeight: FontWeight.w800,
@@ -58,10 +63,8 @@ class _SignInScreenState extends State<SignInScreen> {
                           ),
                     ),
                     const SizedBox(height: 8),
-                    const Text(
-                      'Đăng nhập để mua sắm và theo dõi hành trình của bé.',
-                    ),
-                    const SizedBox(height: 26),
+                    const Text('Chăm sóc thú cưng dễ dàng hơn cùng PawMart.'),
+                    const SizedBox(height: 30),
                     TextFormField(
                       controller: _email,
                       keyboardType: TextInputType.emailAddress,
@@ -76,7 +79,8 @@ class _SignInScreenState extends State<SignInScreen> {
                       ),
                       validator: (value) {
                         final email = value?.trim() ?? '';
-                        return email.contains('@')
+                        return RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]+$')
+                                .hasMatch(email)
                             ? null
                             : 'Nhập email hợp lệ.';
                       },
@@ -126,10 +130,29 @@ class _SignInScreenState extends State<SignInScreen> {
                             )
                           : const Text('Đăng nhập'),
                     ),
-                    const SizedBox(height: 12),
-                    TextButton(
-                      onPressed: () => context.push('/register'),
-                      child: const Text('Chưa có tài khoản? Tạo tài khoản'),
+                    const SizedBox(height: 22),
+                    const _AuthDivider(),
+                    const SizedBox(height: 22),
+                    OutlinedButton.icon(
+                      onPressed: auth.isSubmitting ? null : _googleSignIn,
+                      icon: const Text(
+                        'G',
+                        style: TextStyle(
+                          fontWeight: FontWeight.w900,
+                          fontSize: 19,
+                          color: Color(0xFF4285F4),
+                        ),
+                      ),
+                      label: const Text('Tiếp tục với Google'),
+                    ),
+                    const SizedBox(height: 18),
+                    Center(
+                      child: TextButton(
+                        onPressed: auth.isSubmitting
+                            ? null
+                            : () => context.push('/register'),
+                        child: const Text('Chưa có tài khoản? Đăng ký'),
+                      ),
                     ),
                     TextButton.icon(
                       onPressed: () => context.go('/catalog'),
@@ -152,6 +175,22 @@ class _BrandMark extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => const BrandLockup();
+}
+
+class _AuthDivider extends StatelessWidget {
+  const _AuthDivider();
+
+  @override
+  Widget build(BuildContext context) => const Row(
+    children: [
+      Expanded(child: Divider()),
+      Padding(
+        padding: EdgeInsets.symmetric(horizontal: 16),
+        child: Text('hoặc', style: TextStyle(color: PawmartColors.muted)),
+      ),
+      Expanded(child: Divider()),
+    ],
+  );
 }
 
 class _ErrorMessage extends StatelessWidget {

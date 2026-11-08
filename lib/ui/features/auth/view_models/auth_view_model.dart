@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart';
+import 'package:google_sign_in/google_sign_in.dart';
 
 import '../../../../data/repositories/auth_repository.dart';
 import '../../../../data/services/api_client.dart';
@@ -48,6 +49,8 @@ class AuthViewModel extends ChangeNotifier {
   Future<bool> signIn(String email, String password) =>
       _submit(() => _repository.login(email: email, password: password));
 
+  Future<bool> signInWithGoogle() => _submit(_repository.loginWithGoogle);
+
   Future<bool> register({
     required String email,
     required String fullName,
@@ -73,6 +76,14 @@ class AuthViewModel extends ChangeNotifier {
       return true;
     } on ApiException catch (error) {
       _errorMessage = error.userMessage;
+      return false;
+    } on GoogleSignInException catch (error) {
+      if (error.code != GoogleSignInExceptionCode.canceled) {
+        _errorMessage = 'Không thể đăng nhập bằng Google. Kiểm tra kết nối và cấu hình Google.';
+      }
+      return false;
+    } on StateError catch (error) {
+      _errorMessage = error.message.toString();
       return false;
     } catch (_) {
       _errorMessage = 'Không thể đăng nhập lúc này. Vui lòng thử lại.';

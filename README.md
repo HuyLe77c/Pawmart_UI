@@ -2,6 +2,8 @@
 
 Flutter Android app for the PawMart pet food store. The app uses the ASP.NET API as its source of truth and keeps access tokens in Android secure storage.
 
+Google Sign-In dùng Android OAuth client (package `com.example.pawmart` và SHA-1 của khóa ký) cùng Web OAuth client trong cùng Google Cloud project. Web Client ID công khai của PawMart đã được đặt làm mặc định trong app; khi đổi Google Cloud project có thể ghi đè bằng `--dart-define=GOOGLE_WEB_CLIENT_ID=<WEB_CLIENT_ID>`. BE phải dùng cùng giá trị ở `GoogleAuth:WebClientId`. Xem hướng dẫn `docs/google-sign-in.md` trong repo BE; không cần đưa client secret vào app.
+
 ## Run locally
 
 1. Start SQL Server and the API from `C:\Users\cubin\OneDrive\Desktop\Project_PRM393\Pawmart\Pawmart`:

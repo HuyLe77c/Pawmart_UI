@@ -45,6 +45,7 @@ dependencies:
   url_launcher: ^6.3.3
   intl: ^0.20.3
   image_picker: ^1.2.4
+  google_sign_in: 7.2.0
 
 dev_dependencies:
   flutter_test:

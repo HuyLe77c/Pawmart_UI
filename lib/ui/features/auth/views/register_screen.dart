@@ -40,6 +40,11 @@ class _RegisterScreenState extends State<RegisterScreen> {
     );
   }
 
+  Future<void> _googleSignIn() async {
+    FocusScope.of(context).unfocus();
+    await context.read<AuthViewModel>().signInWithGoogle();
+  }
+
   @override
   Widget build(BuildContext context) => Scaffold(
     appBar: AppBar(leading: const BackButton()),
@@ -59,7 +64,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     const BrandLockup(),
                     const SizedBox(height: 32),
                     Text(
-                      'Tạo tài khoản.',
+                      'Bắt đầu cùng PawMart',
                       style: Theme.of(context).textTheme.headlineSmall
                           ?.copyWith(fontWeight: FontWeight.w800),
                     ),
@@ -91,7 +96,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
                         labelText: 'Email',
                         prefixIcon: Icon(Icons.mail_outline),
                       ),
-                      validator: (value) => (value?.contains('@') ?? false)
+                      validator: (value) =>
+                          RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]+$')
+                              .hasMatch(value?.trim() ?? '')
                           ? null
                           : 'Nhập email hợp lệ.',
                     ),
@@ -152,6 +159,33 @@ class _RegisterScreenState extends State<RegisterScreen> {
                               ),
                             )
                           : const Text('Tạo tài khoản'),
+                    ),
+                    const SizedBox(height: 18),
+                    const Row(
+                      children: [
+                        Expanded(child: Divider()),
+                        Padding(
+                          padding: EdgeInsets.symmetric(horizontal: 16),
+                          child: Text(
+                            'hoặc',
+                            style: TextStyle(color: PawmartColors.muted),
+                          ),
+                        ),
+                        Expanded(child: Divider()),
+                      ],
+                    ),
+                    const SizedBox(height: 18),
+                    OutlinedButton.icon(
+                      onPressed: auth.isSubmitting ? null : _googleSignIn,
+                      icon: const Text(
+                        'G',
+                        style: TextStyle(
+                          fontWeight: FontWeight.w900,
+                          fontSize: 19,
+                          color: Color(0xFF4285F4),
+                        ),
+                      ),
+                      label: const Text('Đăng ký với Google'),
                     ),
                     TextButton(
                       onPressed: () => context.go('/sign-in'),
