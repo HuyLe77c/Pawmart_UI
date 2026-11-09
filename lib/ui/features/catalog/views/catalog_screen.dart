@@ -7,6 +7,9 @@ import 'package:provider/provider.dart';
 import '../../../../data/repositories/catalog_repository.dart';
 import '../../../../data/services/api_client.dart';
 import '../../../../domain/models/product.dart';
+import '../../../../domain/models/catalog_filters.dart';
+import '../../../core/formatters.dart';
+import 'catalog_filter_sheet.dart';
 import '../../auth/view_models/auth_view_model.dart';
 import '../../../core/cart_actions.dart';
 import '../../../core/app_theme.dart';
@@ -21,11 +24,13 @@ class CatalogScreen extends StatelessWidget {
     this.initialSearch,
     this.initialCategoryId,
     this.initialPetType,
+    this.initialShowFilters = false,
   });
 
   final String? initialSearch;
   final int? initialCategoryId;
   final String? initialPetType;
+  final bool initialShowFilters;
 
   @override
   Widget build(BuildContext context) => ChangeNotifierProvider(
@@ -41,12 +46,13 @@ class CatalogScreen extends StatelessWidget {
       viewModel.load();
       return viewModel;
     },
-    child: const _CatalogContent(),
+    child: _CatalogContent(autoOpenFilters: initialShowFilters),
   );
 }
 
 class _CatalogContent extends StatefulWidget {
-  const _CatalogContent();
+  const _CatalogContent({required this.autoOpenFilters});
+  final bool autoOpenFilters;
 
   @override
   State<_CatalogContent> createState() => _CatalogContentState();
@@ -140,466 +146,353 @@ class _CatalogContentState extends State<_CatalogContent> {
     }
   }
 
-  @override
-  Widget build(BuildContext context) => Consumer<CatalogViewModel>(
-    builder: (context, model, _) => Scaffold(
-      appBar: AppBar(
-        toolbarHeight: 72,
-        titleSpacing: 0,
-        leading: !context.canPop() && !context.read<AuthViewModel>().isSignedIn
-            ? Padding(
-                padding: const EdgeInsets.all(2),
-                child: Image.asset(
-                  'assets/branding/pawmart-mark.png',
-                  fit: BoxFit.contain,
-                  semanticLabel: 'PawMart',
-                ),
-              )
-            : IconButton.filledTonal(
-                tooltip: 'Quay lại',
-                style: IconButton.styleFrom(backgroundColor: Colors.white),
-                onPressed: () {
-                  if (context.canPop()) {
-                    context.pop();
-                  } else {
-                    context.go('/customer/home');
-                  }
-                },
-                icon: const Icon(Icons.arrow_back_rounded, size: 20),
-              ),
-        title: TextField(
-          controller: _searchController,
-          textInputAction: TextInputAction.search,
-          onChanged: _searchAsYouType,
-          onSubmitted: (value) {
-            _searchDebounce?.cancel();
-            model.setSearch(value.trim());
-          },
-          decoration: InputDecoration(
-            hintText: 'Tìm trong PawMart…',
-            prefixIcon: const Icon(
-              Icons.search_rounded,
-              color: PawmartColors.green,
-            ),
-            suffixIcon: _searchController.text.isEmpty
-                ? null
-                : IconButton(
-                    tooltip: 'Xóa tìm kiếm',
-                    onPressed: () {
-                      _searchController.clear();
-                      _searchDebounce?.cancel();
-                      model.setSearch('');
-                      setState(() {});
-                    },
-                    icon: const Icon(Icons.close_rounded),
-                  ),
-            fillColor: Colors.white,
+  bool _autoOpened = false;
+
+  Future<void> _showFilters(CatalogViewModel model) async {
+    _searchDebounce?.cancel();
+    // Preserve any search still waiting for debounce when opening the sheet.
+    if (model.search != _searchController.text.trim()) {
+      model.setSearch(_searchController.text.trim());
+    }
+    final filters = await showModalBottomSheet<CatalogFilters>(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: false,
+      useSafeArea: true,
+      backgroundColor: PawmartColors.cream,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(26)),
+      ),
+      builder: (_) => CatalogFilterSheet(
+        initial: model.filters,
+        categories: model.categories,
+      ),
+    );
+    if (filters != null && mounted) await model.applyFilters(filters);
+  }
+
+  List<(String, String)> _selectedFilters(CatalogViewModel model) {
+    final value = model.filters;
+    return [
+      if (value.petType != 'ALL')
+        ('petType', value.petType == 'DOG' ? 'Chó' : 'Mèo'),
+      if (value.categoryId != null)
+        (
+          'category',
+          displayCategoryName(
+            model.categories
+                    .where(
+                      (category) => category.categoryId == value.categoryId,
+                    )
+                    .firstOrNull
+                    ?.categoryName ??
+                'Danh mục đã chọn',
           ),
         ),
-        actions: [
-          if (!context.read<AuthViewModel>().isSignedIn)
-            IconButton(
-              tooltip: 'Đăng nhập',
-              onPressed: () => context.go('/sign-in'),
-              icon: const Icon(Icons.person_outline),
-            ),
-          IconButton(
-            tooltip: 'Giỏ hàng',
-            onPressed: () => context.go('/customer/cart'),
-            icon: const Icon(Icons.shopping_bag_outlined),
-          ),
-        ],
-      ),
-      body: Column(
-        children: [
-          if (MediaQuery.viewInsetsOf(context).bottom == 0)
-            Padding(
-              padding: const EdgeInsets.fromLTRB(18, 10, 18, 0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const _CatalogSectionLabel('DÀNH CHO THÚ CƯNG'),
-                  const SizedBox(height: 8),
-                  Row(
-                    children: [
-                      _PetChoice(
-                        'Tất cả',
-                        Icons.pets_rounded,
-                        model.petType == 'ALL',
-                        () => model.setPetType('ALL'),
-                      ),
-                      const SizedBox(width: 8),
-                      _PetChoice(
-                        'Chó',
-                        Icons.pets_outlined,
-                        model.petType == 'DOG',
-                        () => model.setPetType('DOG'),
-                      ),
-                      const SizedBox(width: 8),
-                      _PetChoice(
-                        'Mèo',
-                        Icons.pets_outlined,
-                        model.petType == 'CAT',
-                        () => model.setPetType('CAT'),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-                  const _CatalogSectionLabel('DANH MỤC'),
-                  const SizedBox(height: 8),
-                  SizedBox(
-                    height: 44,
-                    child: ListView.separated(
-                      scrollDirection: Axis.horizontal,
-                      itemCount: model.categories.length + 1,
-                      separatorBuilder: (_, _) => const SizedBox(width: 8),
-                      itemBuilder: (context, index) {
-                        if (index == 0) {
-                          return _FilterChip(
-                            label: 'Tất cả danh mục',
-                            selected: model.categoryId == null,
-                            onSelected: () => model.setCategory(null),
-                          );
-                        }
-                        final category = model.categories[index - 1];
-                        return _FilterChip(
-                          label: displayCategoryName(category.categoryName),
-                          selected: model.categoryId == category.categoryId,
-                          onSelected: () =>
-                              model.setCategory(category.categoryId),
-                        );
-                      },
-                    ),
-                  ),
-                  Align(
-                    alignment: Alignment.centerLeft,
-                    child: TextButton.icon(
-                      onPressed: () => context.push('/stores'),
-                      icon: const Icon(Icons.location_on_outlined, size: 18),
-                      label: const Text('Xem địa chỉ cửa hàng trên bản đồ'),
-                    ),
-                  ),
-                ],
+      if (value.breed?.isNotEmpty == true) ('breed', 'Giống: ${value.breed}'),
+      if (value.minPrice != null || value.maxPrice != null)
+        (
+          'price',
+          value.minPrice != null && value.maxPrice != null
+              ? '${formatVnd(value.minPrice!)} – ${formatVnd(value.maxPrice!)}'
+              : value.minPrice != null
+              ? 'Từ ${formatVnd(value.minPrice!)}'
+              : 'Đến ${formatVnd(value.maxPrice!)}',
+        ),
+      if (value.brand?.isNotEmpty == true) ('brand', value.brand!),
+      if (value.inStockOnly) ('stock', 'Còn bán'),
+    ];
+  }
+
+  @override
+  Widget build(BuildContext context) => Consumer<CatalogViewModel>(
+    builder: (context, model, _) {
+      if (widget.autoOpenFilters && !_autoOpened && !model.isLoading) {
+        _autoOpened = true;
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) _showFilters(model);
+        });
+      }
+      final selected = _selectedFilters(model);
+      final signedIn = context.watch<AuthViewModel>().isSignedIn;
+      return Scaffold(
+        appBar: AppBar(
+          title: const Text('Cửa hàng PawMart'),
+          leading: context.canPop() || signedIn
+              ? IconButton(
+                  tooltip: 'Quay lại',
+                  icon: const Icon(Icons.arrow_back_rounded),
+                  onPressed: () {
+                    if (context.canPop()) {
+                      context.pop();
+                    } else {
+                      context.go('/customer/home');
+                    }
+                  },
+                )
+              : null,
+          actions: [
+            if (!signedIn)
+              IconButton(
+                tooltip: 'Đăng nhập',
+                onPressed: () => context.go('/sign-in'),
+                icon: const Icon(Icons.person_outline),
               ),
+            IconButton(
+              tooltip: 'Giỏ hàng',
+              onPressed: () => context.go('/customer/cart'),
+              icon: const Icon(Icons.shopping_bag_outlined),
             ),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(20, 12, 20, 9),
-            child: Row(
+          ],
+        ),
+        body: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 1120),
+            child: Column(
               children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        displayCategoryName(
-                          model.categories
-                                  .where(
-                                    (c) => c.categoryId == model.categoryId,
-                                  )
-                                  .firstOrNull
-                                  ?.categoryName ??
-                              'Tất cả sản phẩm',
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.w800,
-                        ),
-                      ),
-                      Text(
-                        model.isLoading
-                            ? 'Đang tìm…'
-                            : '${model.totalItems} sản phẩm phù hợp',
-                        style: const TextStyle(
-                          fontSize: 12,
-                          color: PawmartColors.muted,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(width: 8),
-                OutlinedButton.icon(
-                  onPressed: () => _showSort(model),
-                  icon: const Icon(Icons.tune_rounded, size: 17),
-                  label: Text(switch (model.sort) {
-                    'recommended' => 'Khám phá',
-                    'price_asc' => 'Giá thấp',
-                    'price_desc' => 'Giá cao',
-                    'name' => 'Tên A–Z',
-                    _ => 'Mới nhất',
-                  }),
-                  style: OutlinedButton.styleFrom(
-                    backgroundColor: Colors.white,
-                    minimumSize: const Size(0, 44),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          Expanded(
-            child: model.isLoading && model.products.isEmpty
-                ? const _CatalogLoadingGrid()
-                : model.errorMessage != null && model.products.isEmpty
-                ? ErrorPanel(
-                    message: model.errorMessage!,
-                    onRetry: () => model.load(refresh: true),
-                  )
-                : model.products.isEmpty
-                ? RefreshIndicator(
-                    onRefresh: () => model.load(refresh: true),
-                    child: ListView(
-                      children: const [
-                        SizedBox(height: 100),
-                        EmptyState(
-                          title: 'Chưa có sản phẩm phù hợp',
-                          message: 'Thử đổi bộ lọc hoặc quay lại sau nhé.',
-                        ),
-                      ],
-                    ),
-                  )
-                : RefreshIndicator(
-                    onRefresh: () => model.load(refresh: true),
-                    child: NotificationListener<ScrollNotification>(
-                      onNotification: (notification) {
-                        if (notification.metrics.pixels >=
-                            notification.metrics.maxScrollExtent - 240) {
-                          model.loadMore();
-                        }
-                        return false;
-                      },
-                      child: CustomScrollView(
-                        physics: const AlwaysScrollableScrollPhysics(),
-                        slivers: [
-                          SliverPadding(
-                            padding: const EdgeInsets.fromLTRB(20, 4, 20, 16),
-                            sliver: SliverGrid.builder(
-                              itemCount: model.products.length,
-                              gridDelegate:
-                                  const SliverGridDelegateWithFixedCrossAxisCount(
-                                    crossAxisCount: 2,
-                                    mainAxisExtent: 258,
-                                    crossAxisSpacing: 10,
-                                    mainAxisSpacing: 10,
-                                  ),
-                              itemBuilder: (context, index) {
-                                final product = model.products[index];
-                                return ProductCard(
-                                  product: product,
-                                  categoryName: model.categories
-                                      .where(
-                                        (c) =>
-                                            c.categoryId == product.categoryId,
-                                      )
-                                      .firstOrNull
-                                      ?.categoryName,
-                                  adding: _addingId == product.productId,
-                                  onTap: () => context.push(
-                                    '/products/${product.productId}',
-                                  ),
-                                  onAdd: () => _quickAdd(product),
-                                );
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 12, 20, 8),
+                  child: TextField(
+                    controller: _searchController,
+                    textInputAction: TextInputAction.search,
+                    onChanged: _searchAsYouType,
+                    onSubmitted: (value) {
+                      _searchDebounce?.cancel();
+                      model.setSearch(value.trim());
+                    },
+                    decoration: InputDecoration(
+                      labelText: 'Tìm sản phẩm',
+                      hintText: 'Thức ăn, đồ chơi, phụ kiện…',
+                      prefixIcon: const Icon(Icons.search_rounded),
+                      suffixIcon: _searchController.text.isEmpty
+                          ? null
+                          : IconButton(
+                              tooltip: 'Xóa tìm kiếm',
+                              icon: const Icon(Icons.close_rounded),
+                              onPressed: () {
+                                _searchController.clear();
+                                _searchDebounce?.cancel();
+                                model.setSearch('');
+                                setState(() {});
                               },
                             ),
-                          ),
-                          if (model.isLoadingMore)
-                            const SliverToBoxAdapter(
-                              child: Padding(
-                                padding: EdgeInsets.all(20),
-                                child: Center(
-                                  child: CircularProgressIndicator(),
-                                ),
-                              ),
+                    ),
+                  ),
+                ),
+                if (MediaQuery.viewInsetsOf(context).bottom == 0) ...[
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(20, 4, 20, 8),
+                    child: Align(
+                      alignment: Alignment.centerLeft,
+                      child: Wrap(
+                        spacing: 8,
+                        runSpacing: 6,
+                        crossAxisAlignment: WrapCrossAlignment.center,
+                        children: [
+                          FilledButton.tonalIcon(
+                            style: FilledButton.styleFrom(
+                              minimumSize: const Size(0, 44),
+                              backgroundColor: PawmartColors.greenPale,
+                              foregroundColor: PawmartColors.greenDark,
                             ),
-                          if (model.errorMessage != null)
-                            SliverToBoxAdapter(
-                              child: Padding(
-                                padding: const EdgeInsets.all(16),
-                                child: Text(
-                                  model.errorMessage!,
-                                  style: const TextStyle(
-                                    color: PawmartColors.error,
-                                  ),
-                                ),
-                              ),
+                            onPressed:
+                                model.isLoading && model.categories.isEmpty
+                                ? null
+                                : () => _showFilters(model),
+                            icon: const Icon(
+                              Icons.filter_alt_outlined,
+                              size: 20,
+                            ),
+                            label: Text(
+                              selected.isEmpty
+                                  ? 'Bộ lọc'
+                                  : 'Bộ lọc (${model.filters.activeCount})',
+                            ),
+                          ),
+                          OutlinedButton.icon(
+                            onPressed: () => _showSort(model),
+                            icon: const Icon(Icons.swap_vert_rounded, size: 18),
+                            label: Text(switch (model.sort) {
+                              'price_asc' => 'Giá thấp trước',
+                              'price_desc' => 'Giá cao trước',
+                              'newest' => 'Mới nhất',
+                              'name' => 'Tên A–Z',
+                              _ => 'Sắp xếp',
+                            }),
+                          ),
+                          if (selected.isNotEmpty)
+                            TextButton(
+                              onPressed: model.clearFilters,
+                              child: const Text('Xóa bộ lọc'),
                             ),
                         ],
                       ),
                     ),
                   ),
-          ),
-        ],
-      ),
-    ),
-  );
-}
-
-class _CatalogLoadingGrid extends StatelessWidget {
-  const _CatalogLoadingGrid();
-  @override
-  Widget build(BuildContext context) => GridView.builder(
-    padding: const EdgeInsets.fromLTRB(20, 4, 20, 16),
-    gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-      crossAxisCount: 2,
-      mainAxisExtent: 258,
-      crossAxisSpacing: 10,
-      mainAxisSpacing: 10,
-    ),
-    itemCount: 4,
-    itemBuilder: (context, index) => Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        border: Border.all(color: PawmartColors.line),
-        borderRadius: BorderRadius.circular(14),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            height: 156,
-            decoration: const BoxDecoration(
-              color: PawmartColors.greenPale,
-              borderRadius: BorderRadius.vertical(top: Radius.circular(13)),
-            ),
-          ),
-          const Padding(
-            padding: EdgeInsets.fromLTRB(12, 14, 12, 0),
-            child: _CatalogSkeletonLine(width: 70, height: 10),
-          ),
-          const Padding(
-            padding: EdgeInsets.fromLTRB(12, 11, 12, 0),
-            child: _CatalogSkeletonLine(width: 130, height: 13),
-          ),
-          const Spacer(),
-          const Padding(
-            padding: EdgeInsets.fromLTRB(12, 0, 12, 15),
-            child: _CatalogSkeletonLine(width: 90, height: 13),
-          ),
-        ],
-      ),
-    ),
-  );
-}
-
-class _CatalogSkeletonLine extends StatelessWidget {
-  const _CatalogSkeletonLine({required this.width, required this.height});
-  final double width;
-  final double height;
-  @override
-  Widget build(BuildContext context) => Container(
-    width: width,
-    height: height,
-    decoration: BoxDecoration(
-      color: PawmartColors.greenPale,
-      borderRadius: BorderRadius.circular(6),
-    ),
-  );
-}
-
-class _CatalogSectionLabel extends StatelessWidget {
-  const _CatalogSectionLabel(this.label);
-  final String label;
-  @override
-  Widget build(BuildContext context) => Text(
-    label,
-    style: const TextStyle(
-      fontSize: 11,
-      letterSpacing: 0.9,
-      fontWeight: FontWeight.w800,
-      color: PawmartColors.muted,
-    ),
-  );
-}
-
-class _PetChoice extends StatelessWidget {
-  const _PetChoice(this.label, this.icon, this.selected, this.onTap);
-  final String label;
-  final IconData icon;
-  final bool selected;
-  final VoidCallback onTap;
-  @override
-  Widget build(BuildContext context) => Expanded(
-    child: Material(
-      color: selected ? PawmartColors.green : Colors.white,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(13),
-        side: BorderSide(
-          color: selected ? PawmartColors.green : PawmartColors.line,
-        ),
-      ),
-      clipBehavior: Clip.antiAlias,
-      child: InkWell(
-        onTap: onTap,
-        child: SizedBox(
-          height: 44,
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(
-                icon,
-                size: 17,
-                color: selected ? Colors.white : PawmartColors.green,
-              ),
-              const SizedBox(width: 5),
-              Flexible(
-                child: Text(
-                  label,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w700,
-                    color: selected ? Colors.white : PawmartColors.ink,
+                  if (selected.isNotEmpty)
+                    SizedBox(
+                      height: MediaQuery.textScalerOf(context).scale(18) + 34,
+                      child: ListView.separated(
+                        scrollDirection: Axis.horizontal,
+                        padding: const EdgeInsets.symmetric(horizontal: 20),
+                        itemCount: selected.length,
+                        separatorBuilder: (_, _) => const SizedBox(width: 8),
+                        itemBuilder: (_, index) => InputChip(
+                          label: Text(selected[index].$2),
+                          onDeleted: () => model.applyFilters(
+                            model.filters.without(selected[index].$1),
+                          ),
+                          deleteButtonTooltipMessage:
+                              'Bỏ ${selected[index].$2}',
+                        ),
+                      ),
+                    ),
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(20, 4, 20, 10),
+                    child: Align(
+                      alignment: Alignment.centerLeft,
+                      child: Text(
+                        model.isLoading
+                            ? 'Đang tìm sản phẩm…'
+                            : '${model.totalItems} sản phẩm',
+                        style: const TextStyle(
+                          color: PawmartColors.muted,
+                          fontSize: 13,
+                        ),
+                      ),
+                    ),
                   ),
+                ],
+                Expanded(
+                  child: model.isLoading && model.products.isEmpty
+                      ? const LoadingState()
+                      : model.errorMessage != null && model.products.isEmpty
+                      ? ErrorPanel(
+                          message: model.errorMessage!,
+                          onRetry: () => model.load(refresh: true),
+                        )
+                      : model.products.isEmpty
+                      ? RefreshIndicator(
+                          onRefresh: () => model.load(refresh: true),
+                          child: ListView(
+                            physics: const AlwaysScrollableScrollPhysics(),
+                            children: [
+                              EmptyState(
+                                title: 'Chưa có sản phẩm phù hợp',
+                                message: 'Thử mở rộng khoảng giá hoặc bỏ bớt điều kiện lọc.',
+                                actionLabel: selected.isNotEmpty
+                                    ? 'Xóa bộ lọc'
+                                    : null,
+                                onAction: selected.isNotEmpty
+                                    ? model.clearFilters
+                                    : null,
+                              ),
+                            ],
+                          ),
+                        )
+                      : RefreshIndicator(
+                          onRefresh: () => model.load(refresh: true),
+                          child: NotificationListener<ScrollNotification>(
+                            onNotification: (notification) {
+                              if (notification.metrics.pixels >=
+                                  notification.metrics.maxScrollExtent - 240) {
+                                model.loadMore();
+                              }
+                              return false;
+                            },
+                            child: CustomScrollView(
+                              physics: const AlwaysScrollableScrollPhysics(),
+                              slivers: [
+                                SliverPadding(
+                                  padding: const EdgeInsets.fromLTRB(
+                                    20,
+                                    4,
+                                    20,
+                                    16,
+                                  ),
+                                  sliver: SliverLayoutBuilder(
+                                    builder: (context, constraints) {
+                                      final scale =
+                                          MediaQuery.textScalerOf(context)
+                                              .scale(14) /
+                                          14;
+                                      final columns =
+                                          constraints.crossAxisExtent < 300 ||
+                                              scale > 1.6
+                                          ? 1
+                                          : constraints.crossAxisExtent >= 1000
+                                          ? 4
+                                          : constraints.crossAxisExtent >= 700
+                                          ? 3
+                                          : 2;
+                                      return SliverGrid.builder(
+                                        itemCount: model.products.length,
+                                        gridDelegate:
+                                            SliverGridDelegateWithFixedCrossAxisCount(
+                                              crossAxisCount: columns,
+                                              mainAxisExtent:
+                                                  278 +
+                                                  (scale > 1
+                                                      ? (scale - 1) * 110
+                                                      : 0),
+                                              crossAxisSpacing: 12,
+                                              mainAxisSpacing: 14,
+                                            ),
+                                        itemBuilder: (context, index) {
+                                          final product = model.products[index];
+                                          return ProductCard(
+                                            product: product,
+                                            adding:
+                                                _addingId == product.productId,
+                                            categoryName: model.categories
+                                                .where(
+                                                  (category) =>
+                                                      category.categoryId ==
+                                                      product.categoryId,
+                                                )
+                                                .firstOrNull
+                                                ?.categoryName,
+                                            onTap: () => context.push(
+                                              '/products/${product.productId}',
+                                            ),
+                                            onAdd: () => _quickAdd(product),
+                                          );
+                                        },
+                                      );
+                                    },
+                                  ),
+                                ),
+                                if (model.isLoadingMore)
+                                  const SliverToBoxAdapter(
+                                    child: Padding(
+                                      padding: EdgeInsets.all(20),
+                                      child: Center(
+                                        child: CircularProgressIndicator(),
+                                      ),
+                                    ),
+                                  ),
+                                if (model.errorMessage != null)
+                                  SliverToBoxAdapter(
+                                    child: Padding(
+                                      padding: const EdgeInsets.all(16),
+                                      child: TextButton(
+                                        onPressed: model.loadMore,
+                                        child: Text(
+                                          '${model.errorMessage!} Thử lại',
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                              ],
+                            ),
+                          ),
+                        ),
                 ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    ),
-  );
-}
-
-class _FilterChip extends StatelessWidget {
-  const _FilterChip({
-    required this.label,
-    required this.selected,
-    required this.onSelected,
-  });
-  final String label;
-  final bool selected;
-  final VoidCallback onSelected;
-
-  @override
-  Widget build(BuildContext context) => Material(
-    color: selected ? PawmartColors.greenPale : Colors.white,
-    shape: RoundedRectangleBorder(
-      borderRadius: BorderRadius.circular(11),
-      side: BorderSide(
-        color: selected ? PawmartColors.greenPale : PawmartColors.line,
-      ),
-    ),
-    clipBehavior: Clip.antiAlias,
-    child: InkWell(
-      onTap: onSelected,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 200),
-          child: Text(
-            label,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: TextStyle(
-              fontSize: 12,
-              fontWeight: selected ? FontWeight.w800 : FontWeight.w600,
-              color: selected ? PawmartColors.greenDark : PawmartColors.ink,
+              ],
             ),
           ),
         ),
-      ),
-    ),
+      );
+    },
   );
 }

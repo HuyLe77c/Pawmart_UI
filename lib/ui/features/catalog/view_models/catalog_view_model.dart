@@ -5,6 +5,7 @@ import '../../../../data/services/api_client.dart';
 import '../../../../domain/models/category.dart';
 import '../../../../domain/models/paged_result.dart';
 import '../../../../domain/models/product.dart';
+import '../../../../domain/models/catalog_filters.dart';
 
 class CatalogViewModel extends ChangeNotifier {
   CatalogViewModel(this._repository);
@@ -16,6 +17,34 @@ class CatalogViewModel extends ChangeNotifier {
   String petType = 'ALL';
   String sort = 'recommended';
   int? categoryId;
+  String? breed;
+  String? brand;
+  int? minPrice;
+  int? maxPrice;
+  bool inStockOnly = false;
+
+  CatalogFilters get filters => CatalogFilters(
+    petType: petType,
+    categoryId: categoryId,
+    breed: breed,
+    brand: brand,
+    minPrice: minPrice,
+    maxPrice: maxPrice,
+    inStockOnly: inStockOnly,
+  );
+
+  Future<void> applyFilters(CatalogFilters value) async {
+    petType = value.petType;
+    categoryId = value.categoryId;
+    breed = value.breed;
+    brand = value.brand;
+    minPrice = value.minPrice;
+    maxPrice = value.maxPrice;
+    inStockOnly = value.inStockOnly;
+    await load(refresh: true);
+  }
+
+  Future<void> clearFilters() => applyFilters(const CatalogFilters());
   int totalItems = 0;
   int _page = 0;
   bool isLoading = false;
@@ -47,6 +76,11 @@ class CatalogViewModel extends ChangeNotifier {
         search: search,
         categoryId: categoryId,
         petType: petType,
+        breed: breed,
+        brand: brand,
+        minPrice: minPrice,
+        maxPrice: maxPrice,
+        inStockOnly: inStockOnly,
         sort: sort,
         page: 1,
       );
@@ -75,6 +109,11 @@ class CatalogViewModel extends ChangeNotifier {
         search: search,
         categoryId: categoryId,
         petType: petType,
+        breed: breed,
+        brand: brand,
+        minPrice: minPrice,
+        maxPrice: maxPrice,
+        inStockOnly: inStockOnly,
         sort: sort,
         page: _page + 1,
       );
@@ -103,6 +142,7 @@ class CatalogViewModel extends ChangeNotifier {
   }
 
   Future<void> setPetType(String value) async {
+    if (petType != value) breed = null;
     petType = value;
     await load(refresh: true);
   }

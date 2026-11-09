@@ -142,14 +142,16 @@ void main() {
           child: child!,
         ),
         home: Scaffold(
-          body: Center(
-            child: SizedBox(
-              width: 320,
-              child: PetProfileCard(
-                pet: pet,
-                onEdit: () {},
-                onDelete: () {},
-                onAssistant: () {},
+          body: SingleChildScrollView(
+            child: Center(
+              child: SizedBox(
+                width: 320,
+                child: PetProfileCard(
+                  pet: pet,
+                  onEdit: () {},
+                  onDelete: () {},
+                  onAssistant: () {},
+                ),
               ),
             ),
           ),
@@ -158,6 +160,8 @@ void main() {
     );
 
     expect(find.text('Chỉnh sửa'), findsOneWidget);
+    await tester.ensureVisible(find.text('Chỉnh sửa'));
+    await tester.pumpAndSettle();
     expect(tester.takeException(), isNull);
   });
 

@@ -12,6 +12,11 @@ class CatalogRepository {
     String? search,
     int? categoryId,
     String? petType,
+    String? breed,
+    String? brand,
+    int? minPrice,
+    int? maxPrice,
+    bool inStockOnly = false,
     String sort = 'recommended',
     int page = 1,
     int pageSize = 20,
@@ -23,6 +28,11 @@ class CatalogRepository {
       if (search != null && search.trim().isNotEmpty) 'search': search.trim(),
       if (categoryId != null) 'categoryId': '$categoryId',
       if (petType != null && petType != 'ALL') 'petType': petType,
+      if (breed != null && breed.trim().isNotEmpty) 'breed': breed.trim(),
+      if (brand != null && brand.trim().isNotEmpty) 'brand': brand.trim(),
+      if (minPrice != null) 'minPrice': '$minPrice',
+      if (maxPrice != null) 'maxPrice': '$maxPrice',
+      if (inStockOnly) 'inStock': 'true',
     };
     final json = await _apiClient.getJson(
       'api/products',

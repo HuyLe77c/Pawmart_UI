@@ -7,6 +7,7 @@ import '../../data/repositories/orders_repository.dart';
 import '../../data/repositories/pets_repository.dart';
 import '../../data/repositories/recommendation_repository.dart';
 import '../../data/services/api_client.dart';
+import '../../data/services/chat_history_store.dart';
 import '../../data/services/token_store.dart';
 import '../features/auth/view_models/auth_view_model.dart';
 import '../features/chat_ai/view_models/chat_ai_view_model.dart';
@@ -23,6 +24,7 @@ class AppDependencies {
     required this.cartRepository,
     required this.recommendationRepository,
     required this.chatAiViewModel,
+    required this.chatHistoryStore,
     required this.router,
   });
 
@@ -36,6 +38,7 @@ class AppDependencies {
       ..onForbidden = authViewModel.handleSessionExpired;
     final petsRepository = PetsRepository(apiClient);
     final ordersRepository = OrdersRepository(apiClient);
+    final chatHistoryStore = ChatHistoryStore();
     return AppDependencies._(
       tokenStore: tokenStore,
       apiClient: apiClient,
@@ -45,9 +48,11 @@ class AppDependencies {
       ordersRepository: ordersRepository,
       cartRepository: CartRepository(apiClient),
       recommendationRepository: RecommendationRepository(apiClient),
+      chatHistoryStore: chatHistoryStore,
       chatAiViewModel: ChatAiViewModel(
         ChatRepository(apiClient),
         authViewModel,
+        historyStore: chatHistoryStore,
       ),
       router: createAppRouter(authViewModel),
     );
@@ -62,6 +67,7 @@ class AppDependencies {
   final CartRepository cartRepository;
   final RecommendationRepository recommendationRepository;
   final ChatAiViewModel chatAiViewModel;
+  final ChatHistoryStore chatHistoryStore;
   final GoRouter router;
 
   void dispose() {

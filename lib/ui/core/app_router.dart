@@ -74,6 +74,8 @@ GoRouter createAppRouter(AuthViewModel auth) => GoRouter(
     GoRoute(
       path: '/catalog',
       builder: (context, state) => CatalogScreen(
+        initialShowFilters: state.uri.queryParameters['filters'] == '1',
+        initialPetType: state.uri.queryParameters['petType'],
         initialSearch: state.uri.queryParameters['search'],
         initialCategoryId: int.tryParse(
           state.uri.queryParameters['categoryId'] ?? '',
@@ -112,6 +114,7 @@ GoRouter createAppRouter(AuthViewModel auth) => GoRouter(
         GoRoute(
           path: '/customer/categories',
           builder: (context, state) => CatalogScreen(
+            initialShowFilters: state.uri.queryParameters['filters'] == '1',
             initialSearch: state.uri.queryParameters['search'],
             initialPetType: state.uri.queryParameters['petType'],
             initialCategoryId: int.tryParse(

@@ -1,5 +1,3 @@
-import 'dart:io';
-
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
@@ -12,6 +10,8 @@ import '../../../../domain/models/pet_profile.dart';
 import '../../../core/app_theme.dart';
 import '../../../core/widgets/feedback_states.dart';
 import '../view_models/pets_view_model.dart';
+import '../../../core/picked_image.dart';
+import '../../../core/widgets/pet_illustrations.dart';
 
 class PetProfilesScreen extends StatelessWidget {
   const PetProfilesScreen({super.key});
@@ -77,6 +77,7 @@ class _PetProfilesContent extends StatelessWidget {
   Widget build(BuildContext context) => Consumer<PetsViewModel>(
     builder: (context, model, _) => Scaffold(
       appBar: AppBar(
+        backgroundColor: const Color(0xFFF8F5ED),
         title: const Text(
           'Hồ sơ của tôi',
           style: TextStyle(fontWeight: FontWeight.w800),
@@ -94,71 +95,101 @@ class _PetProfilesContent extends StatelessWidget {
           ),
         ],
       ),
-      body: model.isLoading && model.pets.isEmpty
-          ? const LoadingState()
-          : model.errorMessage != null && model.pets.isEmpty
-          ? ErrorPanel(message: model.errorMessage!, onRetry: model.load)
-          : model.pets.isEmpty
-          ? RefreshIndicator(
-              onRefresh: model.load,
-              child: ListView(
-                padding: const EdgeInsets.fromLTRB(20, 14, 20, 24),
-                children: [
-                  const _AccountHeader(),
-                  const SizedBox(height: 22),
-                  Card(
-                    child: EmptyState(
-                      title: 'Thêm thành viên bốn chân',
-                      message: 'Lưu tuổi, giống và cân nặng để nhận gợi ý thức ăn phù hợp.',
-                      actionLabel: 'Tạo hồ sơ cho bé',
-                      onAction: () => _openForm(context),
+      body: PetProfileBackdrop(
+        child: model.isLoading && model.pets.isEmpty
+            ? const LoadingState()
+            : model.errorMessage != null && model.pets.isEmpty
+            ? ErrorPanel(message: model.errorMessage!, onRetry: model.load)
+            : model.pets.isEmpty
+            ? Center(
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 880),
+                  child: RefreshIndicator(
+                    onRefresh: model.load,
+                    child: ListView(
+                      physics: const AlwaysScrollableScrollPhysics(),
+                      padding: const EdgeInsets.fromLTRB(20, 14, 20, 24),
+                      children: [
+                        const _AccountHeader(),
+                        const SizedBox(height: 22),
+                        Card(
+                          child: EmptyState(
+                            title: 'Thêm thành viên bốn chân',
+                            message: 'Lưu tuổi, giống và cân nặng để nhận gợi ý thức ăn phù hợp.',
+                            actionLabel: 'Tạo hồ sơ cho bé',
+                            onAction: () => _openForm(context),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
-                ],
-              ),
-            )
-          : RefreshIndicator(
-              onRefresh: model.load,
-              child: ListView.separated(
-                padding: const EdgeInsets.fromLTRB(20, 10, 20, 28),
-                itemCount: model.pets.length + 2,
-                separatorBuilder: (_, _) => const SizedBox(height: 12),
-                itemBuilder: (context, index) {
-                  if (index == 0) return const _AccountHeader();
-                  if (index == 1) {
-                    return Padding(
-                      padding: const EdgeInsets.fromLTRB(2, 12, 0, 2),
-                      child: Row(
-                        children: [
-                          const Expanded(
-                            child: Text(
-                              'Các bé của tôi',
-                              style: TextStyle(
-                                fontSize: 20,
-                                fontWeight: FontWeight.w800,
-                              ),
+                ),
+              )
+            : Center(
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 880),
+                  child: RefreshIndicator(
+                    onRefresh: model.load,
+                    child: ListView.separated(
+                      physics: const AlwaysScrollableScrollPhysics(),
+                      padding: const EdgeInsets.fromLTRB(20, 10, 20, 28),
+                      itemCount: model.pets.length + 2,
+                      separatorBuilder: (_, _) => const SizedBox(height: 12),
+                      itemBuilder: (context, index) {
+                        if (index == 0) return const _AccountHeader();
+                        if (index == 1) {
+                          return Padding(
+                            padding: const EdgeInsets.fromLTRB(2, 12, 0, 2),
+                            child: Row(
+                              children: [
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      const Text(
+                                        'Các bé của tôi',
+                                        style: TextStyle(
+                                          fontSize: 22,
+                                          fontWeight: FontWeight.w800,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 4),
+                                      Text(
+                                        '${model.pets.length} thành viên trong gia đình',
+                                        style: const TextStyle(
+                                          fontSize: 12,
+                                          color: PawmartColors.muted,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                TextButton.icon(
+                                  onPressed: () => _openForm(context),
+                                  icon: const Icon(Icons.add_rounded, size: 18),
+                                  label: const Text('Thêm bé'),
+                                ),
+                              ],
                             ),
+                          );
+                        }
+                        final pet = model.pets[index - 2];
+                        return PetProfileCard(
+                          key: ValueKey(pet.petId),
+                          pet: pet,
+                          onEdit: () => _openForm(context, pet: pet),
+                          onDelete: () => _delete(context, pet),
+                          onAssistant: () => context.go(
+                            '/customer/assistant?petId=${pet.petId}',
                           ),
-                          TextButton.icon(
-                            onPressed: () => _openForm(context),
-                            icon: const Icon(Icons.add_rounded, size: 18),
-                            label: const Text('Thêm bé'),
-                          ),
-                        ],
-                      ),
-                    );
-                  }
-                  final pet = model.pets[index - 2];
-                  return PetProfileCard(
-                    pet: pet,
-                    onEdit: () => _openForm(context, pet: pet),
-                    onDelete: () => _delete(context, pet),
-                    onAssistant: () =>
-                        context.go('/customer/assistant?petId=${pet.petId}'),
-                  );
-                },
+                        );
+                      },
+                    ),
+                  ),
+                ),
               ),
-            ),
+      ),
     ),
   );
 }
@@ -169,52 +200,152 @@ class _AccountHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final user = context.watch<AuthViewModel>().user;
+    final pets = context.watch<PetsViewModel>().pets;
     final name = user?.fullName.trim() ?? '';
     return Container(
-      padding: const EdgeInsets.all(18),
+      padding: const EdgeInsets.all(22),
       decoration: BoxDecoration(
         color: PawmartColors.greenDark,
-        borderRadius: BorderRadius.circular(22),
+        borderRadius: BorderRadius.circular(28),
+        border: Border.all(color: Colors.white.withValues(alpha: .2)),
+        boxShadow: [
+          BoxShadow(
+            color: PawmartColors.greenDark.withValues(alpha: .12),
+            offset: const Offset(0, 10),
+            blurRadius: 24,
+          ),
+        ],
       ),
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          CircleAvatar(
-            radius: 28,
-            backgroundColor: Colors.white.withValues(alpha: .16),
-            child: Text(
-              name.isEmpty ? 'P' : name[0].toUpperCase(),
-              style: const TextStyle(
-                color: Colors.white,
-                fontWeight: FontWeight.w900,
-                fontSize: 22,
+          Row(
+            children: [
+              Container(
+                width: 44,
+                height: 44,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF2D7A4),
+                  borderRadius: BorderRadius.circular(15),
+                ),
+                child: Center(
+                  child: Text(
+                    name.isEmpty ? 'P' : name[0].toUpperCase(),
+                    style: const TextStyle(
+                      color: PawmartColors.greenDark,
+                      fontWeight: FontWeight.w800,
+                      fontSize: 20,
+                    ),
+                  ),
+                ),
               ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'GIA ĐÌNH PAWMART',
+                      style: TextStyle(
+                        fontSize: 10,
+                        letterSpacing: 1.6,
+                        fontWeight: FontWeight.w700,
+                        color: Color(0xFFF2D7A4),
+                      ),
+                    ),
+                    const SizedBox(height: 3),
+                    Text(
+                      name.isEmpty ? 'Tài khoản PawMart' : name,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w700,
+                        fontSize: 15,
+                      ),
+                    ),
+                    if (user?.email.isNotEmpty == true)
+                      Text(
+                        user!.email,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: Color(0xFFC9E9D8),
+                          fontSize: 12,
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 22),
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final roomy = constraints.maxWidth > 460;
+              return Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      'Nhà có boss,\nvui mỗi ngày.',
+                      style: TextStyle(
+                        fontSize: roomy ? 34 : 26,
+                        height: 1.16,
+                        letterSpacing: -.8,
+                        fontWeight: FontWeight.w800,
+                        color: const Color(0xFFFFF8E9),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 6),
+                  SizedBox(
+                    width: roomy ? 154 : 116,
+                    child: const PetFamilyArtwork(),
+                  ),
+                ],
+              );
+            },
+          ),
+          const SizedBox(height: 14),
+          const Text(
+            'Một góc nhỏ dành riêng cho những thành viên bốn chân bạn yêu thương.',
+            style: TextStyle(
+              color: Color(0xFFC9E9D8),
+              fontSize: 13,
+              height: 1.5,
             ),
           ),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+          const SizedBox(height: 20),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: .08),
+              borderRadius: BorderRadius.circular(14),
+            ),
+            child: Wrap(
+              spacing: 20,
+              runSpacing: 10,
               children: [
-                Text(
-                  name.isEmpty ? 'Tài khoản PawMart' : name,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 18,
-                    fontWeight: FontWeight.w800,
-                  ),
+                _FamilyCount(
+                  icon: Icons.pets_outlined,
+                  value: '${pets.length}',
+                  label: 'thú cưng',
                 ),
-                const SizedBox(height: 3),
-                Text(
-                  user?.email ?? '',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    color: Color(0xFFC9E9D8),
-                    fontSize: 12,
+                if (pets.any((pet) => pet.petType == 'DOG'))
+                  _FamilyCount(
+                    icon: Icons.favorite_outline,
+                    value:
+                        '${pets.where((pet) => pet.petType == 'DOG').length}',
+                    label: 'bé chó',
                   ),
-                ),
+                if (pets.any((pet) => pet.petType == 'CAT'))
+                  _FamilyCount(
+                    icon: Icons.favorite_outline,
+                    value:
+                        '${pets.where((pet) => pet.petType == 'CAT').length}',
+                    label: 'bé mèo',
+                  ),
               ],
             ),
           ),
@@ -222,6 +353,34 @@ class _AccountHeader extends StatelessWidget {
       ),
     );
   }
+}
+
+class _FamilyCount extends StatelessWidget {
+  const _FamilyCount({
+    required this.icon,
+    required this.value,
+    required this.label,
+  });
+  final IconData icon;
+  final String value;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) => Row(
+    mainAxisSize: MainAxisSize.min,
+    children: [
+      Icon(icon, size: 16, color: const Color(0xFFC9E9D8)),
+      const SizedBox(width: 7),
+      Text(
+        '$value $label',
+        style: const TextStyle(
+          color: Colors.white,
+          fontWeight: FontWeight.w600,
+          fontSize: 13,
+        ),
+      ),
+    ],
+  );
 }
 
 class PetProfileCard extends StatelessWidget {
@@ -232,7 +391,6 @@ class PetProfileCard extends StatelessWidget {
     required this.onDelete,
     required this.onAssistant,
   });
-
   final PetProfile pet;
   final VoidCallback onEdit;
   final VoidCallback onDelete;
@@ -245,237 +403,322 @@ class PetProfileCard extends StatelessWidget {
       'DOG' => 'Chó',
       _ => 'Thú cưng',
     };
-    final weight = pet.weightKg == null ? 'Chưa rõ' : '${pet.weightKg} kg';
+    final gender = switch (pet.gender) {
+      'MALE' => 'Đực',
+      'FEMALE' => 'Cái',
+      _ => 'Chưa rõ',
+    };
     final imageUrl = pet.imageUrl?.trim().isNotEmpty != true
         ? null
         : context.read<ApiClient>().resolveMediaUri(pet.imageUrl!).toString();
-
+    final missing = [
+      if (pet.breed?.trim().isNotEmpty != true) 'giống',
+      if (pet.ageMonths == null) 'tuổi',
+      if (pet.weightKg == null) 'cân nặng',
+      if (pet.gender == 'UNKNOWN') 'giới tính',
+    ];
     return Card(
+      elevation: 1,
+      shadowColor: PawmartColors.greenDark.withValues(alpha: .08),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(26),
+        side: const BorderSide(color: Color(0xFFE2E6D9)),
+      ),
       clipBehavior: Clip.antiAlias,
-      child: Padding(
-        padding: const EdgeInsets.all(18),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: PawmartColors.greenPale,
-                borderRadius: BorderRadius.circular(18),
-              ),
-              child: Row(
-                children: [
-                  Container(
-                    width: 86,
-                    height: 86,
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(17),
-                    ),
-                    clipBehavior: Clip.antiAlias,
-                    child: imageUrl == null
-                        ? const Icon(
-                            Icons.pets_rounded,
-                            size: 34,
-                            color: PawmartColors.green,
-                          )
-                        : Image.network(
-                            imageUrl,
-                            fit: BoxFit.cover,
-                            errorBuilder: (_, _, _) => const Icon(
-                              Icons.pets_rounded,
-                              size: 34,
-                              color: PawmartColors.green,
-                            ),
-                          ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 20, 12, 0),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  width: 76,
+                  height: 84,
+                  clipBehavior: Clip.antiAlias,
+                  decoration: BoxDecoration(
+                    color: pet.petType == 'DOG'
+                        ? PawmartColors.amberPale
+                        : PawmartColors.greenPale,
+                    borderRadius: BorderRadius.circular(20),
                   ),
-                  const SizedBox(width: 14),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          species.toUpperCase(),
-                          style: const TextStyle(
-                            fontSize: 11,
-                            letterSpacing: 1,
-                            fontWeight: FontWeight.w800,
-                            color: PawmartColors.green,
-                          ),
+                  child: imageUrl == null
+                      ? PetPortraitArtwork(petType: pet.petType)
+                      : Image.network(
+                          imageUrl,
+                          fit: BoxFit.cover,
+                          errorBuilder: (_, _, _) =>
+                              PetPortraitArtwork(petType: pet.petType),
                         ),
-                        const SizedBox(height: 3),
-                        Text(
-                          pet.petName,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            fontSize: 22,
-                            fontWeight: FontWeight.w900,
-                            color: PawmartColors.ink,
-                          ),
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        species.toUpperCase(),
+                        style: const TextStyle(
+                          fontSize: 11,
+                          letterSpacing: 1.4,
+                          fontWeight: FontWeight.w800,
+                          color: PawmartColors.green,
                         ),
-                        Text(
-                          pet.breed?.trim().isNotEmpty == true
-                              ? pet.breed!
-                              : 'Chưa thêm giống',
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            fontSize: 13,
-                            color: PawmartColors.muted,
-                          ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        pet.petName,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontSize: 23,
+                          height: 1.15,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: -.5,
                         ),
-                      ],
-                    ),
-                  ),
-                  PopupMenuButton<String>(
-                    tooltip: 'Tùy chọn hồ sơ',
-                    icon: const Icon(Icons.more_horiz_rounded),
-                    onSelected: (value) {
-                      if (value == 'delete') {
-                        onDelete();
-                      }
-                    },
-                    itemBuilder: (context) => const [
-                      PopupMenuItem(
-                        value: 'delete',
-                        child: Row(
-                          children: [
-                            Icon(
-                              Icons.delete_outline_rounded,
-                              size: 18,
-                              color: PawmartColors.error,
-                            ),
-                            SizedBox(width: 8),
-                            Text(
-                              'Xóa hồ sơ',
-                              style: TextStyle(color: PawmartColors.error),
-                            ),
-                          ],
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        pet.breed?.trim().isNotEmpty == true
+                            ? pet.breed!
+                            : 'Chưa thêm giống',
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontSize: 13,
+                          color: PawmartColors.muted,
                         ),
                       ),
                     ],
                   ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 18),
-            Row(
-              children: [
-                Expanded(
-                  child: _PetMetric(
-                    icon: Icons.cake_outlined,
-                    label: 'Tuổi',
-                    value: _age(pet.ageMonths),
-                  ),
                 ),
-                Container(
-                  width: 1,
-                  height: 42,
-                  margin: const EdgeInsets.symmetric(horizontal: 10),
-                  color: PawmartColors.line,
-                ),
-                Expanded(
-                  child: _PetMetric(
-                    icon: Icons.monitor_weight_outlined,
-                    label: 'Cân nặng',
-                    value: weight,
-                  ),
-                ),
-              ],
-            ),
-            if (pet.bodySize != null ||
-                pet.gender != 'UNKNOWN' ||
-                pet.activityLevel != null ||
-                pet.bodyConditionScore != null) ...[
-              const SizedBox(height: 12),
-              Wrap(
-                spacing: 7,
-                runSpacing: 7,
-                children: [
-                  if (pet.gender != 'UNKNOWN')
-                    _PetTag(
-                      label: pet.gender == 'MALE'
-                          ? 'Giới tính: Đực'
-                          : 'Giới tính: Cái',
-                    ),
-                  if (pet.bodySize != null)
-                    _PetTag(
-                      label: switch (pet.bodySize) {
-                        'SMALL' => 'Size nhỏ',
-                        'MEDIUM' => 'Size vừa',
-                        'LARGE' => 'Size lớn',
-                        _ => pet.bodySize!,
-                      },
-                    ),
-                  if (pet.activityLevel != null)
-                    _PetTag(
-                      label: switch (pet.activityLevel) {
-                        'LOW' => 'Ít vận động',
-                        'MODERATE' => 'Vận động vừa',
-                        'HIGH' => 'Vận động nhiều',
-                        _ => pet.activityLevel!,
-                      },
-                    ),
-                  if (pet.bodyConditionScore != null)
-                    _PetTag(label: 'Thể trạng ${pet.bodyConditionScore}/9'),
-                ],
-              ),
-            ],
-            if (pet.specialNotes?.trim().isNotEmpty == true) ...[
-              const SizedBox(height: 14),
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: PawmartColors.cream,
-                  borderRadius: BorderRadius.circular(13),
-                ),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Icon(
-                      Icons.favorite_border_rounded,
-                      size: 17,
-                      color: PawmartColors.amber,
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        pet.specialNotes!,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          fontSize: 12,
-                          height: 1.35,
-                          color: PawmartColors.muted,
-                        ),
+                PopupMenuButton<String>(
+                  tooltip: 'Tùy chọn hồ sơ',
+                  icon: const Icon(Icons.more_horiz_rounded),
+                  onSelected: (value) {
+                    if (value == 'delete') onDelete();
+                  },
+                  itemBuilder: (_) => const [
+                    PopupMenuItem(
+                      value: 'delete',
+                      child: Row(
+                        children: [
+                          Icon(
+                            Icons.delete_outline_rounded,
+                            size: 20,
+                            color: PawmartColors.error,
+                          ),
+                          SizedBox(width: 8),
+                          Text(
+                            'Xóa hồ sơ',
+                            style: TextStyle(color: PawmartColors.error),
+                          ),
+                        ],
                       ),
                     ),
                   ],
                 ),
-              ),
-            ],
-            const SizedBox(height: 16),
-            Row(
+              ],
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Expanded(
-                  child: FilledButton.tonal(
-                    onPressed: onEdit,
-                    child: const Text('Chỉnh sửa'),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    vertical: 14,
+                    horizontal: 4,
+                  ),
+                  decoration: BoxDecoration(
+                    color: PawmartColors.cream,
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: LayoutBuilder(
+                    builder: (context, constraints) {
+                      final columns =
+                          constraints.maxWidth < 240 ||
+                              MediaQuery.textScalerOf(context).scale(14) > 21
+                          ? 2
+                          : 3;
+                      return Wrap(
+                        runSpacing: 14,
+                        children: [
+                          SizedBox(
+                            width: constraints.maxWidth / columns,
+                            child: _PetMetric(
+                              icon: Icons.cake_outlined,
+                              label: 'Tuổi',
+                              value: _age(pet.ageMonths),
+                            ),
+                          ),
+                          SizedBox(
+                            width: constraints.maxWidth / columns,
+                            child: _PetMetric(
+                              icon: Icons.monitor_weight_outlined,
+                              label: 'Cân nặng',
+                              value: pet.weightKg == null
+                                  ? 'Chưa rõ'
+                                  : '${pet.weightKg} kg',
+                            ),
+                          ),
+                          SizedBox(
+                            width: constraints.maxWidth / columns,
+                            child: _PetMetric(
+                              icon: pet.gender == 'MALE'
+                                  ? Icons.male_rounded
+                                  : pet.gender == 'FEMALE'
+                                  ? Icons.female_rounded
+                                  : Icons.pets_outlined,
+                              label: 'Giới tính',
+                              value: gender,
+                            ),
+                          ),
+                        ],
+                      );
+                    },
                   ),
                 ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: OutlinedButton(
-                    onPressed: onAssistant,
-                    child: const Text('Tư vấn'),
+                if (pet.bodySize != null ||
+                    pet.activityLevel != null ||
+                    pet.bodyConditionScore != null) ...[
+                  const SizedBox(height: 16),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      if (pet.bodySize != null)
+                        _PetTag(
+                          label: switch (pet.bodySize) {
+                            'SMALL' => 'Dáng nhỏ',
+                            'MEDIUM' => 'Dáng vừa',
+                            'LARGE' => 'Dáng lớn',
+                            _ => pet.bodySize!,
+                          },
+                        ),
+                      if (pet.activityLevel != null)
+                        _PetTag(
+                          label: switch (pet.activityLevel) {
+                            'LOW' => 'Ít vận động',
+                            'MODERATE' => 'Vận động vừa',
+                            'HIGH' => 'Nhiều năng lượng',
+                            _ => pet.activityLevel!,
+                          },
+                        ),
+                      if (pet.bodyConditionScore != null)
+                        _PetTag(label: 'Thể trạng ${pet.bodyConditionScore}/9'),
+                    ],
                   ),
+                ],
+                if (pet.feedingHabits?.trim().isNotEmpty == true ||
+                    pet.foodPreferences?.trim().isNotEmpty == true ||
+                    pet.specialNotes?.trim().isNotEmpty == true) ...[
+                  const SizedBox(height: 20),
+                  ExpansionTile(
+                    tilePadding: EdgeInsets.zero,
+                    childrenPadding: const EdgeInsets.only(bottom: 12),
+                    shape: const Border(),
+                    collapsedShape: const Border(),
+                    title: const Text(
+                      'Hiểu bé hơn',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    subtitle: const Text(
+                      'Thói quen, khẩu vị & lưu ý',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: PawmartColors.muted,
+                      ),
+                    ),
+                    children: [
+                      if (pet.feedingHabits?.trim().isNotEmpty == true)
+                        _PetDetail(
+                          icon: Icons.schedule_outlined,
+                          title: 'Thói quen ăn uống',
+                          text: pet.feedingHabits!,
+                        ),
+                      if (pet.foodPreferences?.trim().isNotEmpty == true)
+                        _PetDetail(
+                          icon: Icons.restaurant_outlined,
+                          title: 'Khẩu vị yêu thích',
+                          text: pet.foodPreferences!,
+                        ),
+                      if (pet.specialNotes?.trim().isNotEmpty == true)
+                        _PetDetail(
+                          icon: Icons.favorite_outline_rounded,
+                          title: 'Lưu ý chăm sóc',
+                          text: pet.specialNotes!,
+                        ),
+                    ],
+                  ),
+                ],
+                if (missing.isNotEmpty) ...[
+                  const SizedBox(height: 18),
+                  Row(
+                    children: [
+                      const Icon(
+                        Icons.assignment_outlined,
+                        size: 16,
+                        color: PawmartColors.green,
+                      ),
+                      const SizedBox(width: 6),
+                      Expanded(
+                        child: Text(
+                          'Thông tin cơ bản: ${4 - missing.length}/4',
+                          style: const TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(4),
+                    child: LinearProgressIndicator(
+                      value: (4 - missing.length) / 4,
+                      minHeight: 4,
+                      backgroundColor: PawmartColors.greenPale,
+                      semanticsLabel: 'Mức hoàn thiện thông tin cơ bản',
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    'Bổ sung ${missing.join(', ')} để PawMart hiểu bé hơn.',
+                    style: const TextStyle(
+                      fontSize: 12,
+                      color: PawmartColors.muted,
+                    ),
+                  ),
+                ],
+                const SizedBox(height: 20),
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton(
+                        onPressed: onEdit,
+                        child: const Text('Chỉnh sửa'),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: FilledButton(
+                        onPressed: onAssistant,
+                        child: const Text('Tư vấn'),
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
@@ -489,50 +732,70 @@ class PetProfileCard extends StatelessWidget {
   }
 }
 
+class _PetDetail extends StatelessWidget {
+  const _PetDetail({
+    required this.icon,
+    required this.title,
+    required this.text,
+  });
+  final IconData icon;
+  final String title;
+  final String text;
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.only(top: 14),
+    child: Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Icon(icon, size: 19, color: PawmartColors.green),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                title,
+                style: const TextStyle(
+                  fontSize: 12,
+                  color: PawmartColors.muted,
+                ),
+              ),
+              const SizedBox(height: 3),
+              Text(text, style: const TextStyle(fontSize: 13, height: 1.5)),
+            ],
+          ),
+        ),
+      ],
+    ),
+  );
+}
+
 class _PetMetric extends StatelessWidget {
   const _PetMetric({
     required this.icon,
     required this.label,
     required this.value,
   });
-
   final IconData icon;
   final String label;
   final String value;
-
   @override
   Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+    padding: const EdgeInsets.symmetric(horizontal: 10),
     child: Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Row(
-          children: [
-            Icon(icon, size: 15, color: PawmartColors.green),
-            const SizedBox(width: 5),
-            Expanded(
-              child: Text(
-                label,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
-                  fontSize: 11,
-                  color: PawmartColors.muted,
-                ),
-              ),
-            ),
-          ],
+        Icon(icon, size: 19, color: PawmartColors.green),
+        const SizedBox(height: 8),
+        Text(
+          label,
+          style: const TextStyle(fontSize: 12, color: PawmartColors.muted),
         ),
-        const SizedBox(height: 4),
+        const SizedBox(height: 3),
         Text(
           value,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          style: const TextStyle(
-            fontSize: 14,
-            fontWeight: FontWeight.w800,
-            color: PawmartColors.ink,
-          ),
+          style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w800),
         ),
       ],
     ),
@@ -541,22 +804,20 @@ class _PetMetric extends StatelessWidget {
 
 class _PetTag extends StatelessWidget {
   const _PetTag({required this.label});
-
   final String label;
-
   @override
   Widget build(BuildContext context) => Container(
-    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
     decoration: BoxDecoration(
-      color: PawmartColors.cream,
-      borderRadius: BorderRadius.circular(9),
+      color: PawmartColors.greenPale,
+      borderRadius: BorderRadius.circular(8),
     ),
     child: Text(
       label,
       style: const TextStyle(
-        fontSize: 11,
-        fontWeight: FontWeight.w700,
-        color: PawmartColors.muted,
+        fontSize: 12,
+        fontWeight: FontWeight.w600,
+        color: PawmartColors.greenDark,
       ),
     ),
   );
@@ -1405,8 +1666,8 @@ class _PetPhotoPicker extends StatelessWidget {
                       width: 110,
                       height: 122,
                       child: selectedPhoto != null
-                          ? Image.file(
-                              File(selectedPhoto!.path),
+                          ? PickedImage(
+                              file: selectedPhoto!,
                               fit: BoxFit.cover,
                               errorBuilder: (_, _, _) => placeholder(),
                             )
