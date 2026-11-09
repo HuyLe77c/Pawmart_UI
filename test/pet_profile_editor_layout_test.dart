@@ -183,9 +183,25 @@ void main() {
 
     expect(repository.savedRequest, containsPair('petName', 'Miu'));
     expect(repository.savedRequest, containsPair('petType', 'CAT'));
+    expect(repository.savedRequest, containsPair('gender', 'UNKNOWN'));
     expect(repository.savedRequest, containsPair('ageMonths', 14));
     expect(repository.savedRequest, containsPair('weightKg', 4.2));
     expect(find.text('Chỉnh sửa hồ sơ'), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('Chọn giới tính và lưu vào hồ sơ thú cưng', (tester) async {
+    final repository = _RecordingPetsRepository();
+    final viewModel = PetsViewModel(repository);
+    const pet = PetProfile(petId: 12, petName: 'Miu', petType: 'CAT');
+    await openEditor(tester, pet: pet, viewModel: viewModel);
+    await tester.ensureVisible(find.text('Cái'));
+    await tester.tap(find.text('Cái'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Lưu thay đổi'));
+    await tester.pumpAndSettle();
+
+    expect(repository.savedRequest, containsPair('gender', 'FEMALE'));
     expect(tester.takeException(), isNull);
   });
 

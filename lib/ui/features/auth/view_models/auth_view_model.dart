@@ -63,16 +63,22 @@ class AuthViewModel extends ChangeNotifier {
       password: password,
       phoneNumber: phoneNumber,
     ),
+    signIn: false,
   );
 
-  Future<bool> _submit(Future<AppUserSession> Function() action) async {
+  Future<bool> _submit(
+    Future<AppUserSession> Function() action, {
+    bool signIn = true,
+  }) async {
     _isSubmitting = true;
     _errorMessage = null;
     notifyListeners();
     try {
       final session = await action();
-      _user = session.user;
-      _status = AuthStatus.signedIn;
+      if (signIn) {
+        _user = session.user;
+        _status = AuthStatus.signedIn;
+      }
       return true;
     } on ApiException catch (error) {
       _errorMessage = error.userMessage;

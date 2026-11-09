@@ -72,9 +72,7 @@ class AuthRepository {
       if (phoneNumber != null && phoneNumber.trim().isNotEmpty)
         'phoneNumber': phoneNumber.trim(),
     }) as Map<String, dynamic>;
-    final session = AuthApiModel.fromJson(json).toDomain();
-    await _tokenStore.write(session.accessToken);
-    return session;
+    return AuthApiModel.fromJson(json).toDomain();
   }
 
   Future<AppUser> me() async {

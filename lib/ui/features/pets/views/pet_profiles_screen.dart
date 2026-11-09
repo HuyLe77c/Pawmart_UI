@@ -385,6 +385,7 @@ class PetProfileCard extends StatelessWidget {
               ],
             ),
             if (pet.bodySize != null ||
+                pet.gender != 'UNKNOWN' ||
                 pet.activityLevel != null ||
                 pet.bodyConditionScore != null) ...[
               const SizedBox(height: 12),
@@ -392,6 +393,12 @@ class PetProfileCard extends StatelessWidget {
                 spacing: 7,
                 runSpacing: 7,
                 children: [
+                  if (pet.gender != 'UNKNOWN')
+                    _PetTag(
+                      label: pet.gender == 'MALE'
+                          ? 'Giới tính: Đực'
+                          : 'Giới tính: Cái',
+                    ),
                   if (pet.bodySize != null)
                     _PetTag(
                       label: switch (pet.bodySize) {
@@ -574,6 +581,7 @@ class _PetFormSheetState extends State<PetProfileEditorSheet> {
   late final TextEditingController _feedingHabits;
   late final TextEditingController _foodPreferences;
   late String _type;
+  late String _gender;
   String? _bodySize;
   String? _activityLevel;
   int? _bodyConditionScore;
@@ -600,6 +608,7 @@ class _PetFormSheetState extends State<PetProfileEditorSheet> {
     _feedingHabits = TextEditingController(text: pet?.feedingHabits ?? '');
     _foodPreferences = TextEditingController(text: pet?.foodPreferences ?? '');
     _type = pet?.petType ?? 'DOG';
+    _gender = pet?.gender ?? 'UNKNOWN';
     _bodySize = pet?.bodySize;
     _activityLevel = pet?.activityLevel;
     _bodyConditionScore = pet?.bodyConditionScore;
@@ -654,6 +663,7 @@ class _PetFormSheetState extends State<PetProfileEditorSheet> {
         request: {
           'petName': _name.text.trim(),
           'petType': _type,
+          'gender': _gender,
           'breed': _breed.text.trim().isEmpty ? null : _breed.text.trim(),
           'ageMonths': ageMonths,
           'weightKg': weight,
@@ -891,6 +901,51 @@ class _PetFormSheetState extends State<PetProfileEditorSheet> {
                                           onTap: () =>
                                               setState(() => _type = 'CAT'),
                                         ),
+                                      ),
+                                    ],
+                                  ),
+                                ],
+                              ),
+                              Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const Text(
+                                    'Giới tính',
+                                    style: TextStyle(
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 8),
+                                  Wrap(
+                                    spacing: 8,
+                                    runSpacing: 8,
+                                    children: [
+                                      ChoiceChip(
+                                        label: const Text('Đực'),
+                                        avatar: const Icon(
+                                          Icons.male_rounded,
+                                          size: 18,
+                                        ),
+                                        selected: _gender == 'MALE',
+                                        onSelected: (_) =>
+                                            setState(() => _gender = 'MALE'),
+                                      ),
+                                      ChoiceChip(
+                                        label: const Text('Cái'),
+                                        avatar: const Icon(
+                                          Icons.female_rounded,
+                                          size: 18,
+                                        ),
+                                        selected: _gender == 'FEMALE',
+                                        onSelected: (_) =>
+                                            setState(() => _gender = 'FEMALE'),
+                                      ),
+                                      ChoiceChip(
+                                        label: const Text('Chưa rõ'),
+                                        selected: _gender == 'UNKNOWN',
+                                        onSelected: (_) =>
+                                            setState(() => _gender = 'UNKNOWN'),
                                       ),
                                     ],
                                   ),

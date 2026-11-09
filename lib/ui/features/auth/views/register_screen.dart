@@ -32,11 +32,18 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
   Future<void> _register() async {
     if (!_formKey.currentState!.validate()) return;
-    await context.read<AuthViewModel>().register(
+    final success = await context.read<AuthViewModel>().register(
       email: _email.text,
       fullName: _name.text,
       phoneNumber: _phone.text,
       password: _password.text,
+    );
+    if (!mounted || !success) return;
+    context.go('/sign-in');
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Đăng ký thành công. Vui lòng đăng nhập để tiếp tục.'),
+      ),
     );
   }
 

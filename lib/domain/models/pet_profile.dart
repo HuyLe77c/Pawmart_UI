@@ -3,6 +3,7 @@ class PetProfile {
     required this.petId,
     required this.petName,
     required this.petType,
+    this.gender = 'UNKNOWN',
     this.breed,
     this.ageMonths,
     this.weightKg,
@@ -18,6 +19,7 @@ class PetProfile {
   final int petId;
   final String petName;
   final String petType;
+  final String gender;
   final String? breed;
   final int? ageMonths;
   final double? weightKg;
@@ -33,6 +35,7 @@ class PetProfile {
     petId: json['petId'] as int,
     petName: json['petName'] as String,
     petType: json['petType'] as String,
+    gender: json['gender'] as String? ?? 'UNKNOWN',
     breed: json['breed'] as String?,
     ageMonths: json['ageMonths'] as int?,
     weightKg: (json['weightKg'] as num?)?.toDouble(),
