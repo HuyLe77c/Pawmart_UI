@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -22,11 +23,13 @@ class _MyAppState extends State<MyApp> {
   @override
   void initState() {
     super.initState();
+    const configuredBaseUrl = String.fromEnvironment('API_BASE_URL');
     _dependencies = AppDependencies.create(
-      baseUrl: const String.fromEnvironment(
-        'API_BASE_URL',
-        defaultValue: 'http://10.0.2.2:5165',
-      ),
+      baseUrl: configuredBaseUrl.isNotEmpty
+          ? configuredBaseUrl
+          : kIsWeb
+          ? 'http://localhost:5165'
+          : 'http://10.0.2.2:5165',
     );
     _dependencies.authViewModel.initialize();
   }

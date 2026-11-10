@@ -108,6 +108,49 @@ void main() {
     auth.dispose();
     client.close();
   });
+
+  test('Tư vấn khôi phục hội thoại khi mở lại và tách khỏi Chat AI', () async {
+    final tokenStore = TokenStore();
+    final client = ApiClient(
+      baseUrl: 'http://localhost',
+      tokenStore: tokenStore,
+    );
+    final auth = AuthViewModel(_AuthRepository(client, tokenStore), tokenStore);
+    expect(await auth.signIn('customer@pawmart.vn', 'secret'), isTrue);
+
+    final store = _MemoryChatHistoryStore();
+    final repository = _ChatRepository(client);
+    final first = ChatAiViewModel(
+      repository,
+      auth,
+      historyStore: store,
+      historyScope: 'assistant',
+    );
+    expect(await first.send('Bé ăn gì?', petName: 'Milo'), isFalse);
+    await pumpEventQueue();
+    first.dispose();
+
+    final reopened = ChatAiViewModel(
+      repository,
+      auth,
+      historyStore: store,
+      historyScope: 'assistant',
+    );
+    final generalChat = ChatAiViewModel(
+      repository,
+      auth,
+      historyStore: store,
+    );
+    await pumpEventQueue();
+    expect(reopened.entries.single.content, 'Bé ăn gì?');
+    expect(reopened.canRetry, isTrue);
+    expect(generalChat.entries, isEmpty);
+
+    reopened.dispose();
+    generalChat.dispose();
+    auth.dispose();
+    client.close();
+  });
 }
 
 class _AuthRepository extends AuthRepository {

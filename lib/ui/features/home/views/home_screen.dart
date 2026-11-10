@@ -5,11 +5,9 @@ import 'package:provider/provider.dart';
 
 import '../../../../data/repositories/cart_repository.dart';
 import '../../../../data/repositories/catalog_repository.dart';
-import '../../../../data/repositories/orders_repository.dart';
 import '../../../../data/services/api_client.dart';
 import '../../../../domain/models/category.dart';
 import '../../../../domain/models/product.dart';
-import '../../../../domain/models/order.dart';
 import '../../../../domain/models/promotion.dart';
 import '../../../core/app_theme.dart';
 import '../../../core/category_label.dart';
@@ -26,10 +24,8 @@ class HomeScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => ChangeNotifierProvider(
-    create: (context) => HomeViewModel(
-      CatalogRepository(context.read<ApiClient>()),
-      OrdersRepository(context.read<ApiClient>()),
-    )..load(),
+    create: (context) =>
+        HomeViewModel(CatalogRepository(context.read<ApiClient>()))..load(),
     child: const _HomeContent(),
   );
 }
@@ -281,12 +277,6 @@ class _HomeContentState extends State<_HomeContent> {
                                 message: 'Bạn có thể xem danh mục hoặc hỏi PawMart để được hỗ trợ.',
                                 actionLabel: 'Hỏi PawMart',
                                 onAction: () => context.go('/customer/chat-ai'),
-                              ),
-                            ),
-                          if (model.publicReviews?.items.isNotEmpty == true)
-                            SliverToBoxAdapter(
-                              child: _CustomerVoices(
-                                reviews: model.publicReviews!,
                               ),
                             ),
                           SliverToBoxAdapter(
@@ -825,110 +815,6 @@ class _CatalogReviewNotice extends StatelessWidget {
               height: 1.5,
               color: PawmartColors.greenDark,
             ),
-          ),
-        ),
-      ],
-    ),
-  );
-}
-
-class _CustomerVoices extends StatelessWidget {
-  const _CustomerVoices({required this.reviews});
-  final PublicOrderReviews reviews;
-
-  @override
-  Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.only(top: 24),
-    child: Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 20),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text(
-                'Khách hàng chia sẻ',
-                style: TextStyle(
-                  fontSize: 19,
-                  fontWeight: FontWeight.w800,
-                  color: PawmartColors.ink,
-                ),
-              ),
-              const SizedBox(height: 3),
-              Text(
-                '${reviews.averageRating.toStringAsFixed(1)}/5 · ${reviews.total} đánh giá từ đơn hàng đã hoàn tất',
-                style: const TextStyle(
-                  color: PawmartColors.muted,
-                  fontSize: 12,
-                ),
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(height: 12),
-        SizedBox(
-          height: 170,
-          child: ListView.separated(
-            scrollDirection: Axis.horizontal,
-            padding: const EdgeInsets.symmetric(horizontal: 20),
-            itemCount: reviews.items.length,
-            separatorBuilder: (_, _) => const SizedBox(width: 10),
-            itemBuilder: (context, index) {
-              final review = reviews.items[index];
-              return SizedBox(
-                width: 270,
-                child: Card(
-                  child: Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            Expanded(
-                              child: Text(
-                                review.authorName,
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.w800,
-                                ),
-                              ),
-                            ),
-                            Text(
-                              '${review.rating}/5 ★',
-                              style: const TextStyle(
-                                color: Color(0xFFB67B20),
-                                fontWeight: FontWeight.w800,
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 10),
-                        Expanded(
-                          child: Text(
-                            review.comment?.isNotEmpty == true
-                                ? review.comment!
-                                : 'Đánh giá bằng số sao',
-                            maxLines: 4,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                        if (review.shopReply?.isNotEmpty == true)
-                          Text(
-                            'PawMart: ${review.shopReply}',
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
-                              fontSize: 11,
-                              color: PawmartColors.greenDark,
-                            ),
-                          ),
-                      ],
-                    ),
-                  ),
-                ),
-              );
-            },
           ),
         ),
       ],

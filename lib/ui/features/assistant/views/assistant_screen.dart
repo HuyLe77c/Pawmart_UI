@@ -27,6 +27,8 @@ class AssistantScreen extends StatelessWidget {
         create: (context) => ChatAiViewModel(
           ChatRepository(context.read<AppDependencies>().apiClient),
           context.read<AppDependencies>().authViewModel,
+          historyStore: context.read<AppDependencies>().chatHistoryStore,
+          historyScope: 'assistant',
         ),
       ),
     ],

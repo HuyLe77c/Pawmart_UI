@@ -23,6 +23,8 @@ Google Sign-In dùng Android OAuth client (package `com.example.pawmart` và SHA
 
    `10.0.2.2` is the Android Emulator address for the host computer. For a physical phone, use the computer's LAN IP and allow inbound access to port 5165.
 
+   For Flutter web on the same computer, run `flutter run -d chrome`. Web defaults to `http://localhost:5165`; the API's Development CORS policy accepts local browser origins. If the API runs elsewhere, pass `--dart-define=API_BASE_URL=<API URL>` and add that browser origin to the API's CORS policy.
+
 ## Roles and features
 
 - Public users can browse/search/filter the catalog. Sign in or register to manage pet profiles, cart, COD checkout, orders, pet-specific Tư vấn, and a separate Chat AI screen linked from the customer home page.

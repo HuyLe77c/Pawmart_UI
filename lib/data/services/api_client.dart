@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:http/http.dart' as http;
+import 'package:image_picker/image_picker.dart';
 
 import 'token_store.dart';
 
@@ -80,7 +81,7 @@ class ApiClient {
   Future<dynamic> postMultipart(
     String path, {
     required String fileFieldName,
-    required String filePath,
+    required XFile file,
   }) async {
     const uploadTimeout = Duration(minutes: 2);
     final request = http.MultipartRequest('POST', _buildUri(path, null))
@@ -92,7 +93,12 @@ class ApiClient {
 
     try {
       request.files.add(
-        await http.MultipartFile.fromPath(fileFieldName, filePath),
+        http.MultipartFile(
+          fileFieldName,
+          file.openRead(),
+          await file.length(),
+          filename: file.name,
+        ),
       );
       final streamed = await _httpClient.send(request).timeout(uploadTimeout);
       final response = await http.Response.fromStream(streamed)

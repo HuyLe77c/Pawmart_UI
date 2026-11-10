@@ -41,7 +41,7 @@ class PetsViewModel extends ChangeNotifier {
           : await _repository.update(petId, request);
       if (photo != null) {
         try {
-          saved = await _repository.uploadImage(saved.petId, photo.path);
+          saved = await _repository.uploadImage(saved.petId, photo);
         } on ApiException catch (error) {
           errorMessage =
               'Hồ sơ đã lưu nhưng ảnh chưa tải lên: ${error.userMessage}';

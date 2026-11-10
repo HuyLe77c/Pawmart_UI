@@ -1,23 +1,19 @@
 import 'package:flutter/foundation.dart' show ChangeNotifier;
 
 import '../../../../data/repositories/catalog_repository.dart';
-import '../../../../data/repositories/orders_repository.dart';
 import '../../../../data/services/api_client.dart';
-import '../../../../domain/models/order.dart';
 import '../../../../domain/models/category.dart';
 import '../../../../domain/models/product.dart';
 import '../../../../domain/models/promotion.dart';
 
 class HomeViewModel extends ChangeNotifier {
-  HomeViewModel(this._repository, this._orders);
+  HomeViewModel(this._repository);
   final CatalogRepository _repository;
-  final OrdersRepository _orders;
 
   List<Category> categories = const [];
   List<Product> featured = const [];
   List<Product> products = const [];
   List<Promotion> promotions = const [];
-  PublicOrderReviews? publicReviews;
   bool isLoading = false;
   String? errorMessage;
 
@@ -34,11 +30,6 @@ class HomeViewModel extends ChangeNotifier {
           .toList(growable: false);
       featured = featuredItems;
       promotions = await _repository.activePromotions();
-      try {
-        publicReviews = await _orders.publicReviews();
-      } catch (_) {
-        publicReviews = null;
-      }
     } on ApiException catch (error) {
       errorMessage = error.userMessage;
     } catch (_) {

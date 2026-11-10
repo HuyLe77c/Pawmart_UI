@@ -54,11 +54,11 @@ void main() {
           final page = int.parse(request.url.queryParameters['page'] ?? '1');
           body = {
             'page': page,
-            'pageSize': 20,
+            'pageSize': 12,
             'totalItems': empty
                 ? 0
                 : paged
-                ? 2
+                ? 24
                 : 1,
             'items': empty
                 ? []
@@ -175,8 +175,9 @@ void main() {
           inStockOnly: true,
         ),
       );
-      await model.loadMore();
+      await model.goToPage(2);
       expect(queries.last, containsPair('page', '2'));
+      expect(queries.last, containsPair('pageSize', '12'));
       for (final query in queries.skip(1)) {
         expect(query, containsPair('petType', 'DOG'));
         expect(query, containsPair('categoryId', '1'));
@@ -186,8 +187,10 @@ void main() {
         expect(query, containsPair('maxPrice', '300000'));
         expect(query, containsPair('inStock', 'true'));
       }
-      expect(model.products, hasLength(2));
+      expect(model.products, hasLength(1));
+      expect(model.currentPage, 2);
       await model.setSort('price_asc');
+      expect(model.currentPage, 1);
       await model.setSearch('adult');
       expect(queries.last, containsPair('minPrice', '100000'));
       expect(queries.last, containsPair('search', 'adult'));
@@ -217,6 +220,17 @@ void main() {
     expect(queries.last, containsPair('petType', 'CAT'));
     expect(queries.last, isNot(contains('breed')));
     expect(queries.last, containsPair('maxPrice', '300000'));
+  });
+
+  testWidgets('Page controls request the selected page', (tester) async {
+    paged = true;
+    await mount(tester);
+    await tester.tap(find.widgetWithText(OutlinedButton, '2'));
+    await tester.pumpAndSettle();
+    expect(queries.last, containsPair('page', '2'));
+    expect(queries.last, containsPair('pageSize', '12'));
+    expect(find.widgetWithText(FilledButton, '2'), findsOneWidget);
+    expect(find.text('Trang 2/2'), findsNothing);
   });
 
   testWidgets('Apply all filters once, then remove a selected criterion', (

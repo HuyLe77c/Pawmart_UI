@@ -10,6 +10,7 @@ import '../../../../domain/models/catalog_filters.dart';
 class CatalogViewModel extends ChangeNotifier {
   CatalogViewModel(this._repository);
   final CatalogRepository _repository;
+  static const int pageSize = 12;
 
   List<Product> products = const [];
   List<Category> categories = const [];
@@ -46,23 +47,22 @@ class CatalogViewModel extends ChangeNotifier {
 
   Future<void> clearFilters() => applyFilters(const CatalogFilters());
   int totalItems = 0;
-  int _page = 0;
+  int currentPage = 1;
+  int get totalPages => (totalItems + pageSize - 1) ~/ pageSize;
   bool isLoading = false;
-  bool isLoadingMore = false;
   String? errorMessage;
   bool _loadedCategories = false;
   int _requestRevision = 0;
 
   Future<void> load({bool refresh = false}) async {
-    if (!refresh && (isLoading || isLoadingMore)) return;
+    if (!refresh && isLoading) return;
     final revision = ++_requestRevision;
     isLoading = true;
     errorMessage = null;
     if (refresh) {
       products = const [];
-      _page = 0;
+      currentPage = 1;
       totalItems = 0;
-      isLoadingMore = false;
     }
     notifyListeners();
     try {
@@ -82,7 +82,8 @@ class CatalogViewModel extends ChangeNotifier {
         maxPrice: maxPrice,
         inStockOnly: inStockOnly,
         sort: sort,
-        page: 1,
+        page: currentPage,
+        pageSize: pageSize,
       );
       if (revision == _requestRevision) _applyFirstPage(result);
     } on ApiException catch (error) {
@@ -99,41 +100,13 @@ class CatalogViewModel extends ChangeNotifier {
     }
   }
 
-  Future<void> loadMore() async {
-    if (isLoading || isLoadingMore || products.length >= totalItems) return;
-    final revision = _requestRevision;
-    isLoadingMore = true;
-    notifyListeners();
-    try {
-      final result = await _repository.search(
-        search: search,
-        categoryId: categoryId,
-        petType: petType,
-        breed: breed,
-        brand: brand,
-        minPrice: minPrice,
-        maxPrice: maxPrice,
-        inStockOnly: inStockOnly,
-        sort: sort,
-        page: _page + 1,
-      );
-      if (revision == _requestRevision) {
-        products = [...products, ...result.items];
-        _page = result.page;
-        totalItems = result.totalItems;
-      }
-    } on ApiException catch (error) {
-      if (revision == _requestRevision) errorMessage = error.userMessage;
-    } catch (_) {
-      if (revision == _requestRevision) {
-        errorMessage = 'Không tải thêm được sản phẩm.';
-      }
-    } finally {
-      if (revision == _requestRevision) {
-        isLoadingMore = false;
-        notifyListeners();
-      }
+  Future<void> goToPage(int page) async {
+    if (isLoading || page == currentPage || page < 1 || page > totalPages) {
+      return;
     }
+    currentPage = page;
+    products = const [];
+    await load();
   }
 
   Future<void> setSearch(String value) async {
@@ -160,6 +133,6 @@ class CatalogViewModel extends ChangeNotifier {
   void _applyFirstPage(PagedResult<Product> result) {
     products = result.items;
     totalItems = result.totalItems;
-    _page = result.page;
+    currentPage = result.page;
   }
 }

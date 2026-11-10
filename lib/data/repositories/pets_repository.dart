@@ -1,3 +1,5 @@
+import 'package:image_picker/image_picker.dart';
+
 import '../../domain/models/pet_profile.dart';
 import '../services/api_client.dart';
 
@@ -22,12 +24,12 @@ class PetsRepository {
             as Map<String, dynamic>,
       );
 
-  Future<PetProfile> uploadImage(int petId, String filePath) async =>
+  Future<PetProfile> uploadImage(int petId, XFile file) async =>
       PetProfile.fromJson(
         await _apiClient.postMultipart(
           'api/pets/$petId/image',
           fileFieldName: 'file',
-          filePath: filePath,
+          file: file,
         ) as Map<String, dynamic>,
       );
 

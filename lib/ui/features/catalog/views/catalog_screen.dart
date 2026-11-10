@@ -62,6 +62,7 @@ class _CatalogContentState extends State<_CatalogContent> {
   late final TextEditingController _searchController;
   int? _addingId;
   Timer? _searchDebounce;
+  final ScrollController _gridController = ScrollController();
 
   @override
   void initState() {
@@ -75,7 +76,13 @@ class _CatalogContentState extends State<_CatalogContent> {
   void dispose() {
     _searchDebounce?.cancel();
     _searchController.dispose();
+    _gridController.dispose();
     super.dispose();
+  }
+
+  Future<void> _goToPage(CatalogViewModel model, int page) async {
+    await model.goToPage(page);
+    if (mounted && _gridController.hasClients) _gridController.jumpTo(0);
   }
 
   void _searchAsYouType(String value) {
@@ -369,11 +376,11 @@ class _CatalogContentState extends State<_CatalogContent> {
                       : model.errorMessage != null && model.products.isEmpty
                       ? ErrorPanel(
                           message: model.errorMessage!,
-                          onRetry: () => model.load(refresh: true),
+                          onRetry: model.load,
                         )
                       : model.products.isEmpty
                       ? RefreshIndicator(
-                          onRefresh: () => model.load(refresh: true),
+                          onRefresh: model.load,
                           child: ListView(
                             physics: const AlwaysScrollableScrollPhysics(),
                             children: [
@@ -391,100 +398,80 @@ class _CatalogContentState extends State<_CatalogContent> {
                           ),
                         )
                       : RefreshIndicator(
-                          onRefresh: () => model.load(refresh: true),
-                          child: NotificationListener<ScrollNotification>(
-                            onNotification: (notification) {
-                              if (notification.metrics.pixels >=
-                                  notification.metrics.maxScrollExtent - 240) {
-                                model.loadMore();
-                              }
-                              return false;
-                            },
-                            child: CustomScrollView(
-                              physics: const AlwaysScrollableScrollPhysics(),
-                              slivers: [
-                                SliverPadding(
-                                  padding: const EdgeInsets.fromLTRB(
-                                    20,
-                                    4,
-                                    20,
-                                    16,
-                                  ),
-                                  sliver: SliverLayoutBuilder(
-                                    builder: (context, constraints) {
-                                      final scale =
-                                          MediaQuery.textScalerOf(context)
-                                              .scale(14) /
-                                          14;
-                                      final columns =
-                                          constraints.crossAxisExtent < 300 ||
-                                              scale > 1.6
-                                          ? 1
-                                          : constraints.crossAxisExtent >= 1000
-                                          ? 4
-                                          : constraints.crossAxisExtent >= 700
-                                          ? 3
-                                          : 2;
-                                      return SliverGrid.builder(
-                                        itemCount: model.products.length,
-                                        gridDelegate:
-                                            SliverGridDelegateWithFixedCrossAxisCount(
-                                              crossAxisCount: columns,
-                                              mainAxisExtent:
-                                                  278 +
-                                                  (scale > 1
-                                                      ? (scale - 1) * 110
-                                                      : 0),
-                                              crossAxisSpacing: 12,
-                                              mainAxisSpacing: 14,
-                                            ),
-                                        itemBuilder: (context, index) {
-                                          final product = model.products[index];
-                                          return ProductCard(
-                                            product: product,
-                                            adding:
-                                                _addingId == product.productId,
-                                            categoryName: model.categories
-                                                .where(
-                                                  (category) =>
-                                                      category.categoryId ==
-                                                      product.categoryId,
-                                                )
-                                                .firstOrNull
-                                                ?.categoryName,
-                                            onTap: () => context.push(
-                                              '/products/${product.productId}',
-                                            ),
-                                            onAdd: () => _quickAdd(product),
-                                          );
-                                        },
-                                      );
-                                    },
+                          onRefresh: model.load,
+                          child: CustomScrollView(
+                            controller: _gridController,
+                            physics: const AlwaysScrollableScrollPhysics(),
+                            slivers: [
+                              SliverPadding(
+                                padding: const EdgeInsets.fromLTRB(
+                                  20,
+                                  4,
+                                  20,
+                                  16,
+                                ),
+                                sliver: SliverLayoutBuilder(
+                                  builder: (context, constraints) {
+                                    final scale =
+                                        MediaQuery.textScalerOf(context)
+                                            .scale(14) /
+                                        14;
+                                    final columns =
+                                        constraints.crossAxisExtent < 300 ||
+                                            scale > 1.6
+                                        ? 1
+                                        : constraints.crossAxisExtent >= 1000
+                                        ? 4
+                                        : constraints.crossAxisExtent >= 700
+                                        ? 3
+                                        : 2;
+                                    return SliverGrid.builder(
+                                      itemCount: model.products.length,
+                                      gridDelegate:
+                                          SliverGridDelegateWithFixedCrossAxisCount(
+                                            crossAxisCount: columns,
+                                            mainAxisExtent:
+                                                278 +
+                                                (scale > 1
+                                                    ? (scale - 1) * 110
+                                                    : 0),
+                                            crossAxisSpacing: 12,
+                                            mainAxisSpacing: 14,
+                                          ),
+                                      itemBuilder: (context, index) {
+                                        final product = model.products[index];
+                                        return ProductCard(
+                                          product: product,
+                                          adding:
+                                              _addingId == product.productId,
+                                          categoryName: model.categories
+                                              .where(
+                                                (category) =>
+                                                    category.categoryId ==
+                                                    product.categoryId,
+                                              )
+                                              .firstOrNull
+                                              ?.categoryName,
+                                          onTap: () => context.push(
+                                            '/products/${product.productId}',
+                                          ),
+                                          onAdd: () => _quickAdd(product),
+                                        );
+                                      },
+                                    );
+                                  },
+                                ),
+                              ),
+                              if (model.totalPages > 1)
+                                SliverToBoxAdapter(
+                                  child: _CatalogPagination(
+                                    currentPage: model.currentPage,
+                                    totalPages: model.totalPages,
+                                    onPageSelected: (page) =>
+                                        _goToPage(model, page),
                                   ),
                                 ),
-                                if (model.isLoadingMore)
-                                  const SliverToBoxAdapter(
-                                    child: Padding(
-                                      padding: EdgeInsets.all(20),
-                                      child: Center(
-                                        child: CircularProgressIndicator(),
-                                      ),
-                                    ),
-                                  ),
-                                if (model.errorMessage != null)
-                                  SliverToBoxAdapter(
-                                    child: Padding(
-                                      padding: const EdgeInsets.all(16),
-                                      child: TextButton(
-                                        onPressed: model.loadMore,
-                                        child: Text(
-                                          '${model.errorMessage!} Thử lại',
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                              ],
-                            ),
+                            ],
                           ),
                         ),
                 ),
@@ -494,5 +481,52 @@ class _CatalogContentState extends State<_CatalogContent> {
         ),
       );
     },
+  );
+}
+
+class _CatalogPagination extends StatelessWidget {
+  const _CatalogPagination({
+    required this.currentPage,
+    required this.totalPages,
+    required this.onPageSelected,
+  });
+
+  final int currentPage;
+  final int totalPages;
+  final ValueChanged<int> onPageSelected;
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.fromLTRB(0, 4, 0, 28),
+    child: Center(
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            for (var page = 1; page <= totalPages; page++) ...[
+              if (page > 1) const SizedBox(width: 8),
+              SizedBox(
+                width: 44,
+                height: 44,
+                child: page == currentPage
+                    ? FilledButton(
+                        onPressed: () {},
+                        style: FilledButton.styleFrom(padding: EdgeInsets.zero),
+                        child: Text('$page'),
+                      )
+                    : OutlinedButton(
+                        onPressed: () => onPageSelected(page),
+                        style: OutlinedButton.styleFrom(
+                          padding: EdgeInsets.zero,
+                        ),
+                        child: Text('$page'),
+                      ),
+              ),
+            ],
+          ],
+        ),
+      ),
+    ),
   );
 }

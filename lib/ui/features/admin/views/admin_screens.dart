@@ -1,4 +1,3 @@
-import 'dart:io';
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -10,6 +9,7 @@ import 'package:provider/provider.dart';
 
 import '../../../core/app_dependencies.dart';
 import '../../../core/formatters.dart';
+import '../../../core/picked_image.dart';
 import '../../../../data/services/api_client.dart';
 import '../../../core/widgets/feedback_states.dart';
 import '../../../core/widgets/product_artwork.dart';
@@ -622,12 +622,11 @@ class _AdminProductsScreenState extends State<AdminProductsScreen> {
       _snack('Cần tạo danh mục trước.');
       return;
     }
-    final form = await showDialog<Map<String, dynamic>>(
-      context: context,
-      useSafeArea: false,
-      barrierDismissible: false,
-      builder: (context) =>
-          _ProductForm(product: product, categories: categories),
+    final form = await Navigator.of(context).push<Map<String, dynamic>>(
+      MaterialPageRoute(
+        builder: (context) =>
+            _ProductForm(product: product, categories: categories),
+      ),
     );
     if (form == null || !mounted) return;
     final selectedImage = form.remove('_selectedImage') as XFile?;
@@ -650,7 +649,7 @@ class _AdminProductsScreenState extends State<AdminProductsScreen> {
           await api.postMultipart(
             'api/admin/products/$productId/images/upload',
             fileFieldName: 'file',
-            filePath: selectedImage.path,
+            file: selectedImage,
           );
         } catch (e) {
           _snack('Đã lưu sản phẩm nhưng tải ảnh thất bại: ${_error(e)}');
@@ -1380,6 +1379,10 @@ class _ProductForm extends StatefulWidget {
 
 class _ProductFormState extends State<_ProductForm> {
   static const _maxImageBytes = 20 * 1024 * 1024;
+  static final _managedImageUrl = RegExp(
+    r'^/uploads/products/[0-9a-f]{32}\.(jpg|png|webp)$',
+    caseSensitive: false,
+  );
   final name = TextEditingController(),
       price = TextEditingController(),
       stock = TextEditingController(),
@@ -1455,7 +1458,10 @@ class _ProductFormState extends State<_ProductForm> {
         );
         return;
       }
-      setState(() => selectedImage = file);
+      setState(() {
+        selectedImage = file;
+        image.clear();
+      });
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context)
@@ -1658,7 +1664,18 @@ class _ProductFormState extends State<_ProductForm> {
           const SizedBox(height: 10),
           TextField(
             controller: image,
-            decoration: const InputDecoration(labelText: 'URL ảnh (tùy chọn)'),
+            keyboardType: TextInputType.url,
+            decoration: const InputDecoration(
+              labelText: 'URL ảnh (HTTP hoặc HTTPS)',
+              hintText: 'https://example.com/anh-san-pham.jpg',
+            ),
+            onChanged: (value) {
+              if (value.trim().isNotEmpty && selectedImage != null) {
+                setState(() {
+                  selectedImage = null;
+                });
+              }
+            },
           ),
           const SizedBox(height: 8),
           Align(
@@ -1686,8 +1703,8 @@ class _ProductFormState extends State<_ProductForm> {
             const SizedBox(height: 10),
             ClipRRect(
               borderRadius: BorderRadius.circular(12),
-              child: Image.file(
-                File(selectedImage!.path),
+              child: PickedImage(
+                file: selectedImage!,
                 height: 140,
                 width: double.infinity,
                 fit: BoxFit.cover,
@@ -1700,7 +1717,9 @@ class _ProductFormState extends State<_ProductForm> {
             Align(
               alignment: Alignment.centerRight,
               child: TextButton.icon(
-                onPressed: () => setState(() => selectedImage = null),
+                onPressed: () => setState(() {
+                  selectedImage = null;
+                }),
                 icon: const Icon(Icons.close),
                 label: const Text('Bỏ ảnh đã chọn'),
               ),
@@ -1722,6 +1741,7 @@ class _ProductFormState extends State<_ProductForm> {
           onPressed: () {
             final cost = double.tryParse(price.text);
             final quantity = int.tryParse(stock.text);
+            final imageUrl = image.text.trim();
             if (name.text.trim().length < 2 ||
                 cost == null ||
                 cost <= 0 ||
@@ -1732,6 +1752,23 @@ class _ProductFormState extends State<_ProductForm> {
                 const SnackBar(
                   content: Text(
                     'Nhập tên, giá lớn hơn 0, tồn kho không âm và danh mục.',
+                  ),
+                ),
+              );
+              return;
+            }
+            final uri = Uri.tryParse(imageUrl);
+            final validImageUrl =
+                imageUrl.isEmpty ||
+                (uri != null &&
+                    uri.hasAuthority &&
+                    (uri.scheme == 'http' || uri.scheme == 'https')) ||
+                _managedImageUrl.hasMatch(imageUrl);
+            if (!validImageUrl) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text(
+                    'Nhập URL ảnh HTTP(S) hợp lệ hoặc chọn ảnh từ máy.',
                   ),
                 ),
               );
@@ -1767,17 +1804,17 @@ class _ProductFormState extends State<_ProductForm> {
               'sku': widget.product?['sku'],
               'images':
                   widget.product != null &&
-                      image.text.trim() ==
+                      imageUrl ==
                           ((widget.product!['images'] as List<dynamic>?)
                                       ?.firstOrNull?['imageUrl']
                                   as String? ??
                               '')
                   ? widget.product!['images']
-                  : image.text.trim().isEmpty
+                  : imageUrl.isEmpty
                   ? []
                   : [
                       {
-                        'imageUrl': image.text.trim(),
+                        'imageUrl': imageUrl,
                         'isPrimary': true,
                         'displayOrder': 0,
                       },
@@ -1863,7 +1900,7 @@ class _AdminOrdersScreenState extends State<AdminOrdersScreen> {
     final api = context.read<AppDependencies>().apiClient;
     final choices = switch (order['status']) {
       'PENDING' => ['CONFIRMED', 'CANCELLED'],
-      'CONFIRMED' => ['SHIPPING', 'CANCELLED'],
+      'CONFIRMED' => ['SHIPPING'],
       'SHIPPING' => ['DELIVERED'],
       _ => <String>[],
     };
