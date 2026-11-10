@@ -36,11 +36,16 @@ class ProductCard extends StatelessWidget {
               fit: StackFit.expand,
               children: [
                 ColoredBox(
-                  color: const Color(0xFFF2F5F0),
+                  color: const Color(0xFFF1F4EB),
                   child: product.hasVerifiedImage
-                      ? ProductArtwork(
-                          imageUrl: product.primaryImageUrl,
-                          height: 128,
+                      ? Padding(
+                          padding: product.primaryImageUrl == null
+                              ? EdgeInsets.zero
+                              : const EdgeInsets.all(10),
+                          child: ProductArtwork(
+                            imageUrl: product.primaryImageUrl,
+                            height: 128,
+                          ),
                         )
                       : ProductReviewPanel(product: product, height: 128),
                 ),

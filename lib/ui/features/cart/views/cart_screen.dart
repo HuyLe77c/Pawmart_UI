@@ -10,6 +10,7 @@ import '../../../core/formatters.dart';
 import '../../../core/widgets/feedback_states.dart';
 import '../../../core/widgets/product_artwork.dart';
 import '../view_models/cart_view_model.dart';
+import '../../../core/widgets/shopping_action_bar.dart';
 
 class CartScreen extends StatelessWidget {
   const CartScreen({super.key});
@@ -71,76 +72,35 @@ class _CartContent extends StatelessWidget {
                   Expanded(
                     child: RefreshIndicator(
                       onRefresh: model.load,
-                      child: ListView.separated(
-                        padding: const EdgeInsets.fromLTRB(20, 18, 20, 24),
-                        itemCount: cart.items.length + 1,
-                        separatorBuilder: (_, _) => const SizedBox(height: 12),
-                        itemBuilder: (context, index) => index == 0
-                            ? _CartHeading(itemCount: cart.totalQuantity)
-                            : _CartItem(
-                                line: cart.items[index - 1],
-                                viewModel: model,
-                              ),
+                      child: Center(
+                        child: ConstrainedBox(
+                          constraints: const BoxConstraints(maxWidth: 780),
+                          child: ListView.separated(
+                            padding: const EdgeInsets.fromLTRB(20, 18, 20, 24),
+                            itemCount: cart.items.length + 1,
+                            separatorBuilder: (_, _) =>
+                                const SizedBox(height: 12),
+                            itemBuilder: (context, index) => index == 0
+                                ? _CartHeading(itemCount: cart.totalQuantity)
+                                : _CartItem(
+                                    line: cart.items[index - 1],
+                                    viewModel: model,
+                                  ),
+                          ),
+                        ),
                       ),
                     ),
                   ),
-                  SafeArea(
-                    top: false,
-                    child: Container(
-                      padding: const EdgeInsets.fromLTRB(20, 16, 20, 12),
-                      decoration: const BoxDecoration(
-                        color: Colors.white,
-                        border: Border(
-                          top: BorderSide(color: PawmartColors.line),
-                        ),
-                      ),
-                      child: Column(
-                        children: [
-                          Row(
-                            children: [
-                              const Expanded(
-                                child: Text(
-                                  'Tạm tính',
-                                  style: TextStyle(
-                                    color: PawmartColors.muted,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                              ),
-                              Text(
-                                formatVnd(cart.subtotal),
-                                style: const TextStyle(
-                                  color: PawmartColors.greenDark,
-                                  fontSize: 21,
-                                  fontWeight: FontWeight.w900,
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 4),
-                          const Align(
-                            alignment: Alignment.centerLeft,
-                            child: Text(
-                              'Phí giao hàng và tổng tiền sẽ hiện ở bước tiếp theo.',
-                              style: TextStyle(
-                                color: PawmartColors.muted,
-                                fontSize: 12,
-                              ),
-                            ),
-                          ),
-                          const SizedBox(height: 16),
-                          FilledButton.icon(
-                            onPressed: model.isSaving
-                                ? null
-                                : () => context.go('/customer/checkout'),
-                            icon: const Icon(
-                              Icons.lock_outline_rounded,
-                              size: 18,
-                            ),
-                            label: const Text('Tiếp tục thanh toán'),
-                          ),
-                        ],
-                      ),
+                  ShoppingActionBar(
+                    label: 'Tạm tính',
+                    value: formatVnd(cart.subtotal),
+                    detail: 'Phí giao hàng được tính ở bước thanh toán.',
+                    action: FilledButton.icon(
+                      onPressed: model.isSaving
+                          ? null
+                          : () => context.push('/customer/checkout'),
+                      icon: const Icon(Icons.arrow_forward_rounded, size: 18),
+                      label: const Text('Tiếp tục thanh toán'),
                     ),
                   ),
                 ],
@@ -155,33 +115,34 @@ class _CartHeading extends StatelessWidget {
   final int itemCount;
 
   @override
-  Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.only(bottom: 4),
+  Widget build(BuildContext context) => Container(
+    padding: const EdgeInsets.all(18),
+    decoration: BoxDecoration(
+      color: PawmartColors.greenPale,
+      borderRadius: BorderRadius.circular(22),
+    ),
     child: Row(
       children: [
-        const Expanded(
-          child: Text(
-            'Sản phẩm đã chọn',
-            style: TextStyle(
-              color: PawmartColors.ink,
-              fontSize: 18,
-              fontWeight: FontWeight.w800,
-            ),
-          ),
+        const CircleAvatar(
+          backgroundColor: Colors.white,
+          foregroundColor: PawmartColors.greenDark,
+          child: Icon(Icons.shopping_bag_outlined),
         ),
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 6),
-          decoration: BoxDecoration(
-            color: PawmartColors.greenPale,
-            borderRadius: BorderRadius.circular(9),
-          ),
-          child: Text(
-            '$itemCount món',
-            style: const TextStyle(
-              color: PawmartColors.greenDark,
-              fontSize: 12,
-              fontWeight: FontWeight.w800,
-            ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Sản phẩm đã chọn',
+                style: Theme.of(context).textTheme.titleMedium,
+              ),
+              const SizedBox(height: 3),
+              Text(
+                '$itemCount món dành cho bé',
+                style: Theme.of(context).textTheme.bodySmall,
+              ),
+            ],
           ),
         ),
       ],

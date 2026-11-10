@@ -75,6 +75,7 @@ class ChatAiViewModel extends ChangeNotifier {
   bool _hasFailedMessage = false;
   int _generation = 0;
   int _restoreToken = 0;
+  bool _disposed = false;
 
   bool get canRetry => _hasFailedMessage && !isSending;
 
@@ -125,9 +126,19 @@ class ChatAiViewModel extends ChangeNotifier {
     unawaited(store.write(userId, historyScope, snapshot));
   }
 
+  static String _petPrefix(String? name) =>
+      name == null ? '' : 'Hồ sơ thú cưng đang chọn: $name. Câu hỏi: ';
+
+  static int messageLimit({String? petName}) =>
+      2000 - _petPrefix(petName).length;
+
   Future<bool> send(String text, {String? petName}) async {
     final message = text.trim();
-    if (message.isEmpty || message.length > 2000 || isSending) return false;
+    if (message.isEmpty ||
+        message.length > messageLimit(petName: petName) ||
+        isSending) {
+      return false;
+    }
     if (_hasFailedMessage && entries.isNotEmpty) entries.removeLast();
     entries.add(
       ChatEntry(
@@ -135,7 +146,7 @@ class ChatAiViewModel extends ChangeNotifier {
         message,
         requestContent: petName == null
             ? null
-            : 'Hồ sơ thú cưng đang chọn: $petName. Câu hỏi: $message',
+            : '${_petPrefix(petName)}$message',
       ),
     );
     _hasFailedMessage = false;
@@ -191,7 +202,7 @@ class ChatAiViewModel extends ChangeNotifier {
       return false;
     } finally {
       isSending = false;
-      notifyListeners();
+      if (!_disposed) notifyListeners();
     }
   }
 
@@ -211,6 +222,8 @@ class ChatAiViewModel extends ChangeNotifier {
 
   @override
   void dispose() {
+    _disposed = true;
+    _restoreToken++;
     _auth.removeListener(_onAuthChanged);
     super.dispose();
   }

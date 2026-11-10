@@ -2,9 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
-import '../../../core/app_dependencies.dart';
+import '../../../../data/repositories/orders_repository.dart';
+import '../../../../data/services/api_client.dart';
 import '../../../core/app_theme.dart';
 import '../../../core/formatters.dart';
+import '../../../core/widgets/shopping_action_bar.dart';
 import '../../auth/view_models/auth_view_model.dart';
 import '../view_models/checkout_view_model.dart';
 import '../../maps/delivery_address_map_screen.dart';
@@ -15,7 +17,7 @@ class CheckoutScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) => ChangeNotifierProvider(
     create: (context) =>
-        CheckoutViewModel(context.read<AppDependencies>().ordersRepository)
+        CheckoutViewModel(OrdersRepository(context.read<ApiClient>()))
           ..loadQuote()
           ..loadPaymentMethods(),
     child: const _CheckoutBody(),
@@ -75,7 +77,16 @@ class _CheckoutBodyState extends State<_CheckoutBody> {
   }
 
   Future<void> _submit(CheckoutViewModel model) async {
-    if (!_formKey.currentState!.validate()) return;
+    final invalid = _formKey.currentState!.validateGranularly();
+    if (invalid.isNotEmpty) {
+      final field = invalid.first;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (field.mounted) {
+          Scrollable.ensureVisible(field.context, alignment: .15);
+        }
+      });
+      return;
+    }
     final order = await model.submit(
       recipientName: _name.text.trim(),
       recipientPhone: _phone.text.replaceAll(RegExp(r'[\s.-]'), ''),
@@ -93,270 +104,334 @@ class _CheckoutBodyState extends State<_CheckoutBody> {
   }
 
   @override
-  Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(title: const Text('Xác nhận đơn hàng')),
-    body: Consumer<CheckoutViewModel>(
-      builder: (context, model, _) => Form(
-        key: _formKey,
-        child: ListView(
-          padding: const EdgeInsets.fromLTRB(20, 20, 20, 32),
-          children: [
-            const Text(
-              'Kiểm tra người nhận, cách thanh toán và tổng tiền trước khi đặt.',
-              style: TextStyle(color: PawmartColors.muted),
-            ),
-            const SizedBox(height: 22),
-            const _CheckoutSectionTitle('01', 'Giao hàng'),
-            const SizedBox(height: 14),
-            TextFormField(
-              controller: _name,
-              decoration: const InputDecoration(labelText: 'Họ tên người nhận'),
-              autofillHints: const [AutofillHints.name],
-              textInputAction: TextInputAction.next,
-              validator: (v) =>
-                  (v?.trim().length ?? 0) < 2 ? 'Nhập họ tên hợp lệ' : null,
-            ),
-            const SizedBox(height: 12),
-            TextFormField(
-              controller: _phone,
-              keyboardType: TextInputType.phone,
-              autofillHints: const [AutofillHints.telephoneNumber],
-              decoration: const InputDecoration(
-                labelText: 'Số điện thoại',
-                hintText: '0xxxxxxxxx hoặc +84xxxxxxxxx',
-              ),
-              textInputAction: TextInputAction.next,
-              validator: (value) {
-                final phone = value?.replaceAll(RegExp(r'[\s.-]'), '') ?? '';
-                return RegExp(r'^(0[0-9]{9}|\+84[0-9]{9})$').hasMatch(phone)
+  Widget build(BuildContext context) => Consumer<CheckoutViewModel>(
+    builder: (context, model, _) => Scaffold(
+      appBar: AppBar(title: const Text('Xác nhận đơn hàng')),
+      bottomNavigationBar: MediaQuery.viewInsetsOf(context).bottom > 0
+          ? null
+          : ShoppingActionBar(
+              label: 'Tổng thanh toán',
+              value: model.quote == null ? '—' : formatVnd(model.quote!.total),
+              action: FilledButton.icon(
+                onPressed:
+                    model.isSubmitting ||
+                        model.isLoadingQuote ||
+                        model.quote == null
                     ? null
-                    : 'Nhập số điện thoại Việt Nam hợp lệ';
-              },
-            ),
-            const SizedBox(height: 12),
-            TextFormField(
-              controller: _address,
-              onChanged: (_) {
-                if (_latitude != null) {
-                  setState(() {
-                    _latitude = null;
-                    _longitude = null;
-                  });
-                }
-              },
-              minLines: 2,
-              maxLines: 3,
-              autofillHints: const [AutofillHints.streetAddressLine1],
-              decoration: const InputDecoration(
-                labelText: 'Địa chỉ chi tiết',
-                alignLabelWithHint: true,
+                    : () => _submit(model),
+                icon: model.isSubmitting
+                    ? const SizedBox.square(
+                        dimension: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(Icons.check_rounded),
+                label: Text(
+                  model.isSubmitting
+                      ? 'Đang đặt hàng…'
+                      : model.selectedPaymentMethod == 'BANK_QR'
+                      ? 'Tạo đơn và lấy mã QR'
+                      : 'Đặt hàng',
+                ),
               ),
-              validator: (v) => (v?.trim().length ?? 0) < 5
-                  ? 'Địa chỉ cần ít nhất 5 ký tự'
-                  : null,
             ),
-            const SizedBox(height: 10),
-            Material(
-              color: PawmartColors.greenPale,
-              borderRadius: BorderRadius.circular(16),
-              child: InkWell(
-                borderRadius: BorderRadius.circular(16),
-                onTap: _chooseOnMap,
-                child: Padding(
-                  padding: const EdgeInsets.all(15),
-                  child: Row(
-                    children: [
-                      const Icon(
-                        Icons.map_outlined,
-                        color: PawmartColors.green,
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
+      body: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 740),
+          child: Form(
+            key: _formKey,
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.fromLTRB(20, 20, 20, 32),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(20),
+                    decoration: BoxDecoration(
+                      color: PawmartColors.greenDark,
+                      borderRadius: BorderRadius.circular(24),
+                    ),
+                    child: const Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Icon(
+                          Icons.local_shipping_outlined,
+                          color: Color(0xFFF2D7A4),
+                        ),
+                        SizedBox(height: 12),
+                        Text(
+                          'Sắp đến tay bé!',
+                          style: TextStyle(
+                            fontSize: 26,
+                            fontWeight: FontWeight.w800,
+                            color: Colors.white,
+                          ),
+                        ),
+                        SizedBox(height: 6),
+                        Text(
+                          'Kiểm tra địa chỉ giao hàng và phương thức thanh toán trước khi đặt.',
+                          style: TextStyle(
+                            color: Color(0xFFC9E9D8),
+                            height: 1.5,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 22),
+                  const _CheckoutSectionTitle('01', 'Giao hàng'),
+                  const SizedBox(height: 14),
+                  TextFormField(
+                    controller: _name,
+                    decoration: const InputDecoration(
+                      labelText: 'Họ tên người nhận',
+                      prefixIcon: Icon(Icons.person_outline_rounded),
+                    ),
+                    autofillHints: const [AutofillHints.name],
+                    textInputAction: TextInputAction.next,
+                    validator: (v) => (v?.trim().length ?? 0) < 2
+                        ? 'Nhập họ tên hợp lệ'
+                        : null,
+                  ),
+                  const SizedBox(height: 12),
+                  TextFormField(
+                    controller: _phone,
+                    keyboardType: TextInputType.phone,
+                    autofillHints: const [AutofillHints.telephoneNumber],
+                    decoration: const InputDecoration(
+                      labelText: 'Số điện thoại',
+                      prefixIcon: Icon(Icons.phone_outlined),
+                      hintText: '0xxxxxxxxx hoặc +84xxxxxxxxx',
+                    ),
+                    textInputAction: TextInputAction.next,
+                    validator: (value) {
+                      final phone =
+                          value?.replaceAll(RegExp(r'[\s.-]'), '') ?? '';
+                      return RegExp(r'^(0[0-9]{9}|\+84[0-9]{9})$')
+                              .hasMatch(phone)
+                          ? null
+                          : 'Nhập số điện thoại Việt Nam hợp lệ';
+                    },
+                  ),
+                  const SizedBox(height: 12),
+                  TextFormField(
+                    controller: _address,
+                    onChanged: (_) {
+                      if (_latitude != null) {
+                        setState(() {
+                          _latitude = null;
+                          _longitude = null;
+                        });
+                      }
+                    },
+                    minLines: 2,
+                    maxLines: 3,
+                    autofillHints: const [AutofillHints.streetAddressLine1],
+                    decoration: const InputDecoration(
+                      labelText: 'Địa chỉ chi tiết',
+                      prefixIcon: Icon(Icons.location_on_outlined),
+                      alignLabelWithHint: true,
+                    ),
+                    validator: (v) => (v?.trim().length ?? 0) < 5
+                        ? 'Địa chỉ cần ít nhất 5 ký tự'
+                        : null,
+                  ),
+                  const SizedBox(height: 10),
+                  Material(
+                    color: PawmartColors.greenPale,
+                    borderRadius: BorderRadius.circular(16),
+                    child: InkWell(
+                      borderRadius: BorderRadius.circular(16),
+                      onTap: _chooseOnMap,
+                      child: Padding(
+                        padding: const EdgeInsets.all(15),
+                        child: Row(
                           children: [
-                            const Text(
-                              'Chọn trên bản đồ',
-                              style: TextStyle(fontWeight: FontWeight.w800),
+                            const Icon(
+                              Icons.map_outlined,
+                              color: PawmartColors.green,
                             ),
-                            Text(
-                              _latitude == null
-                                  ? 'Tìm địa chỉ, lấy GPS hoặc chạm chọn điểm giao'
-                                  : 'Đã lưu ghim giao hàng · Chạm để chỉnh lại',
-                              style: const TextStyle(
-                                fontSize: 12,
-                                color: PawmartColors.muted,
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const Text(
+                                    'Chọn trên bản đồ',
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.w800,
+                                    ),
+                                  ),
+                                  Text(
+                                    _latitude == null
+                                        ? 'Tìm địa chỉ, lấy GPS hoặc chạm chọn điểm giao'
+                                        : 'Đã lưu ghim giao hàng · Chạm để chỉnh lại',
+                                    style: const TextStyle(
+                                      fontSize: 12,
+                                      color: PawmartColors.muted,
+                                    ),
+                                  ),
+                                ],
                               ),
+                            ),
+                            const Icon(
+                              Icons.arrow_forward_ios_rounded,
+                              size: 16,
+                              color: PawmartColors.green,
                             ),
                           ],
                         ),
                       ),
-                      const Icon(
-                        Icons.arrow_forward_ios_rounded,
-                        size: 16,
-                        color: PawmartColors.green,
-                      ),
-                    ],
+                    ),
                   ),
-                ),
-              ),
-            ),
-            const SizedBox(height: 24),
-            const _CheckoutSectionTitle('02', 'Thanh toán'),
-            const SizedBox(height: 12),
-            _PaymentChoice(
-              icon: Icons.payments_outlined,
-              title: 'Thanh toán khi nhận hàng',
-              subtitle: 'Trả tiền mặt sau khi nhận và kiểm tra hàng',
-              selected: model.selectedPaymentMethod == 'COD',
-              enabled: !model.isSubmitting,
-              onTap: () => model.selectPaymentMethod('COD'),
-            ),
-            const SizedBox(height: 10),
-            _PaymentChoice(
-              icon: Icons.qr_code_2_rounded,
-              title: 'Chuyển khoản bằng mã QR',
-              subtitle: model.paymentMethods?.bankQrAvailable == true
-                  ? 'Tạo QR theo đúng số tiền và mã của đơn hàng'
-                  : model.isLoadingPaymentMethods
-                  ? 'Đang kiểm tra phương thức thanh toán…'
-                  : 'Tạm thời chưa khả dụng',
-              selected: model.selectedPaymentMethod == 'BANK_QR',
-              enabled:
-                  model.paymentMethods?.bankQrAvailable == true &&
-                  !model.isSubmitting,
-              onTap: () => model.selectPaymentMethod('BANK_QR'),
-            ),
-            if (model.selectedPaymentMethod == 'BANK_QR') ...[
-              const SizedBox(height: 8),
-              const Text(
-                'Sau khi đặt hàng, mã QR sẽ xuất hiện trong chi tiết đơn. Trạng thái sẽ tự cập nhật khi hệ thống nhận và đối soát giao dịch ngân hàng.',
-                style: TextStyle(color: PawmartColors.muted, fontSize: 12),
-              ),
-            ],
-            const SizedBox(height: 12),
-            TextFormField(
-              controller: _promo,
-              enabled: !model.isSubmitting,
-              onChanged: (_) => model.invalidateQuote(),
-              decoration: const InputDecoration(
-                labelText: 'Mã khuyến mãi (không bắt buộc)',
-              ),
-            ),
-            Align(
-              alignment: Alignment.centerRight,
-              child: TextButton.icon(
-                onPressed: model.isLoadingQuote || model.isSubmitting
-                    ? null
-                    : () => model.loadQuote(promotionCode: _promo.text.trim()),
-                icon: const Icon(Icons.refresh_rounded),
-                label: const Text('Cập nhật tổng tiền'),
-              ),
-            ),
-            const SizedBox(height: 12),
-            const _CheckoutSectionTitle('03', 'Đơn hàng của bạn'),
-            const SizedBox(height: 12),
-            Card(
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: model.isLoadingQuote
-                    ? const Center(child: CircularProgressIndicator())
-                    : model.quote == null
-                    ? Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            model.quoteError ??
-                                'Cập nhật tổng tiền để tiếp tục.',
-                          ),
-                          const SizedBox(height: 8),
-                          OutlinedButton(
-                            onPressed: () => model.loadQuote(
+                  const SizedBox(height: 24),
+                  const _CheckoutSectionTitle('02', 'Thanh toán'),
+                  const SizedBox(height: 12),
+                  _PaymentChoice(
+                    icon: Icons.payments_outlined,
+                    title: 'Thanh toán khi nhận hàng',
+                    subtitle: 'Trả tiền mặt sau khi nhận và kiểm tra hàng',
+                    selected: model.selectedPaymentMethod == 'COD',
+                    enabled: !model.isSubmitting,
+                    onTap: () => model.selectPaymentMethod('COD'),
+                  ),
+                  const SizedBox(height: 10),
+                  _PaymentChoice(
+                    icon: Icons.qr_code_2_rounded,
+                    title: 'Chuyển khoản bằng mã QR',
+                    subtitle: model.paymentMethods?.bankQrAvailable == true
+                        ? 'Tạo QR theo đúng số tiền và mã của đơn hàng'
+                        : model.isLoadingPaymentMethods
+                        ? 'Đang kiểm tra phương thức thanh toán…'
+                        : 'Tạm thời chưa khả dụng',
+                    selected: model.selectedPaymentMethod == 'BANK_QR',
+                    enabled:
+                        model.paymentMethods?.bankQrAvailable == true &&
+                        !model.isSubmitting,
+                    onTap: () => model.selectPaymentMethod('BANK_QR'),
+                  ),
+                  if (model.selectedPaymentMethod == 'BANK_QR') ...[
+                    const SizedBox(height: 8),
+                    const Text(
+                      'Sau khi đặt hàng, mã QR sẽ xuất hiện trong chi tiết đơn. Trạng thái sẽ tự cập nhật khi hệ thống nhận và đối soát giao dịch ngân hàng.',
+                      style: TextStyle(
+                        color: PawmartColors.muted,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ],
+                  const SizedBox(height: 12),
+                  TextFormField(
+                    controller: _promo,
+                    enabled: !model.isSubmitting,
+                    onChanged: (_) => model.invalidateQuote(),
+                    decoration: const InputDecoration(
+                      labelText: 'Mã khuyến mãi (không bắt buộc)',
+                    ),
+                  ),
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: TextButton.icon(
+                      onPressed: model.isLoadingQuote || model.isSubmitting
+                          ? null
+                          : () => model.loadQuote(
                               promotionCode: _promo.text.trim(),
                             ),
-                            child: const Text('Thử lại'),
-                          ),
-                        ],
-                      )
-                    : Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          for (final item in model.quote!.items) ...[
-                            Row(
+                      icon: const Icon(Icons.refresh_rounded),
+                      label: const Text('Cập nhật tổng tiền'),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  const _CheckoutSectionTitle('03', 'Đơn hàng của bạn'),
+                  const SizedBox(height: 12),
+                  Card(
+                    child: Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: model.isLoadingQuote
+                          ? const Center(child: CircularProgressIndicator())
+                          : model.quote == null
+                          ? Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Expanded(
-                                  child: Column(
+                                Text(
+                                  model.quoteError ??
+                                      'Cập nhật tổng tiền để tiếp tục.',
+                                ),
+                                const SizedBox(height: 8),
+                                OutlinedButton(
+                                  onPressed: () => model.loadQuote(
+                                    promotionCode: _promo.text.trim(),
+                                  ),
+                                  child: const Text('Thử lại'),
+                                ),
+                              ],
+                            )
+                          : Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                for (final item in model.quote!.items) ...[
+                                  Row(
                                     crossAxisAlignment:
                                         CrossAxisAlignment.start,
                                     children: [
-                                      Text(item.productName),
-                                      Text(
-                                        '${item.quantity} × ${formatVnd(item.unitPrice)}',
-                                        style: Theme.of(context)
-                                            .textTheme
-                                            .bodySmall,
+                                      Expanded(
+                                        child: Column(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
+                                          children: [
+                                            Text(item.productName),
+                                            Text(
+                                              '${item.quantity} × ${formatVnd(item.unitPrice)}',
+                                              style: Theme.of(context)
+                                                  .textTheme
+                                                  .bodySmall,
+                                            ),
+                                          ],
+                                        ),
                                       ),
+                                      const SizedBox(width: 8),
+                                      Text(formatVnd(item.lineTotal)),
                                     ],
                                   ),
+                                  const SizedBox(height: 8),
+                                ],
+                                const Divider(),
+                                _PriceRow('Tạm tính', model.quote!.subtotal),
+                                if (model.quote!.discount > 0)
+                                  _PriceRow('Giảm giá', -model.quote!.discount),
+                                _PriceRow(
+                                  'Phí giao hàng',
+                                  model.quote!.shippingFee,
                                 ),
-                                const SizedBox(width: 8),
-                                Text(formatVnd(item.lineTotal)),
+                                const Divider(),
+                                _PriceRow(
+                                  'Tổng thanh toán',
+                                  model.quote!.total,
+                                  prominent: true,
+                                ),
                               ],
                             ),
-                            const SizedBox(height: 8),
-                          ],
-                          const Divider(),
-                          _PriceRow('Tạm tính', model.quote!.subtotal),
-                          if (model.quote!.discount > 0)
-                            _PriceRow('Giảm giá', -model.quote!.discount),
-                          _PriceRow('Phí giao hàng', model.quote!.shippingFee),
-                          const Divider(),
-                          _PriceRow(
-                            'Tổng thanh toán',
-                            model.quote!.total,
-                            prominent: true,
-                          ),
-                        ],
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  TextFormField(
+                    controller: _note,
+                    decoration: const InputDecoration(
+                      labelText: 'Ghi chú cho cửa hàng (không bắt buộc)',
+                    ),
+                  ),
+                  if (model.errorMessage != null) ...[
+                    const SizedBox(height: 12),
+                    Text(
+                      model.errorMessage!,
+                      style: TextStyle(
+                        color: Theme.of(context).colorScheme.error,
                       ),
+                    ),
+                  ],
+                ],
               ),
             ),
-            const SizedBox(height: 12),
-            TextFormField(
-              controller: _note,
-              decoration: const InputDecoration(
-                labelText: 'Ghi chú cho cửa hàng (không bắt buộc)',
-              ),
-            ),
-            if (model.errorMessage != null) ...[
-              const SizedBox(height: 12),
-              Text(
-                model.errorMessage!,
-                style: TextStyle(color: Theme.of(context).colorScheme.error),
-              ),
-            ],
-            const SizedBox(height: 20),
-            FilledButton.icon(
-              onPressed:
-                  model.isSubmitting ||
-                      model.isLoadingQuote ||
-                      model.quote == null
-                  ? null
-                  : () => _submit(model),
-              icon: model.isSubmitting
-                  ? const SizedBox(
-                      width: 18,
-                      height: 18,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
-                  : const Icon(Icons.check),
-              label: Text(
-                model.isSubmitting
-                    ? 'Đang đặt hàng…'
-                    : '${model.selectedPaymentMethod == 'BANK_QR' ? 'Tạo đơn và lấy mã QR' : 'Đặt hàng'} · ${model.quote == null ? '—' : formatVnd(model.quote!.total)}',
-              ),
-            ),
-          ],
+          ),
         ),
       ),
     ),
@@ -390,7 +465,9 @@ class _CheckoutSectionTitle extends StatelessWidget {
         ),
       ),
       const SizedBox(width: 10),
-      Text(title, style: Theme.of(context).textTheme.titleLarge),
+      Expanded(
+        child: Text(title, style: Theme.of(context).textTheme.titleLarge),
+      ),
     ],
   );
 }

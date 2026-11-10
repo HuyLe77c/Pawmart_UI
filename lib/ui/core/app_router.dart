@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../domain/models/pet_profile.dart';
+
 import '../features/cart/views/cart_screen.dart';
 import '../features/auth/view_models/auth_view_model.dart';
 import '../features/auth/views/register_screen.dart';
@@ -128,7 +130,9 @@ GoRouter createAppRouter(AuthViewModel auth) => GoRouter(
         ),
         GoRoute(
           path: '/customer/chat-ai',
-          builder: (context, state) => const ChatAiScreen(),
+          builder: (context, state) => ChatAiScreen(
+            pet: state.extra is PetProfile ? state.extra as PetProfile : null,
+          ),
         ),
         GoRoute(
           path: '/customer/orders',

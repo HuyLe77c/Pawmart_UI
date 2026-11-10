@@ -3,24 +3,50 @@ import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
+import '../../../../data/repositories/chat_repository.dart';
+import '../../../../domain/models/pet_profile.dart';
 import '../../../core/app_dependencies.dart';
+import '../../../core/widgets/pet_illustrations.dart';
 import '../../../core/app_theme.dart';
 import '../view_models/chat_ai_view_model.dart';
 import 'chat_product_links.dart';
 
 class ChatAiScreen extends StatelessWidget {
-  const ChatAiScreen({super.key, this.viewModel});
+  const ChatAiScreen({super.key, this.viewModel, this.pet});
   final ChatAiViewModel? viewModel;
+  final PetProfile? pet;
 
   @override
-  Widget build(BuildContext context) => ChangeNotifierProvider.value(
-    value: viewModel ?? context.read<AppDependencies>().chatAiViewModel,
-    child: const _ChatBody(),
-  );
+  Widget build(BuildContext context) {
+    final profile = pet;
+    final injected = viewModel;
+    final body = _ChatBody(pet: profile);
+    if (injected != null) {
+      return ChangeNotifierProvider.value(value: injected, child: body);
+    }
+    final dependencies = context.read<AppDependencies>();
+    if (profile == null) {
+      return ChangeNotifierProvider.value(
+        value: dependencies.chatAiViewModel,
+        child: body,
+      );
+    }
+    return ChangeNotifierProvider(
+      key: ValueKey(profile.petId),
+      create: (_) => ChatAiViewModel(
+        ChatRepository(dependencies.apiClient),
+        dependencies.authViewModel,
+        historyStore: dependencies.chatHistoryStore,
+        historyScope: 'pet-${profile.petId}',
+      ),
+      child: body,
+    );
+  }
 }
 
 class _ChatBody extends StatefulWidget {
-  const _ChatBody();
+  const _ChatBody({this.pet});
+  final PetProfile? pet;
   @override
   State<_ChatBody> createState() => _ChatBodyState();
 }
@@ -55,9 +81,14 @@ class _ChatBodyState extends State<_ChatBody> {
 
   Future<void> _send(ChatAiViewModel model) async {
     final text = _composer.text.trim();
-    if (text.isEmpty || text.length > 2000 || model.isSending) return;
+    if (text.isEmpty ||
+        text.length >
+            ChatAiViewModel.messageLimit(petName: widget.pet?.petName) ||
+        model.isSending) {
+      return;
+    }
     _composer.clear();
-    final reply = model.send(text);
+    final reply = model.send(text, petName: widget.pet?.petName);
     _scrollToEnd();
     await reply;
     if (mounted) _scrollToEnd();
@@ -98,8 +129,16 @@ class _ChatBodyState extends State<_ChatBody> {
       appBar: AppBar(
         toolbarHeight: 76,
         leading: IconButton(
-          tooltip: 'Về trang chủ',
-          onPressed: () => context.go('/customer/home'),
+          tooltip: widget.pet == null ? 'Về trang chủ' : 'Quay lại hồ sơ',
+          onPressed: () {
+            if (widget.pet != null && context.canPop()) {
+              context.pop();
+            } else {
+              context.go(
+                widget.pet == null ? '/customer/home' : '/customer/profile',
+              );
+            }
+          },
           icon: const Icon(Icons.arrow_back_rounded),
         ),
         titleSpacing: 0,
@@ -142,6 +181,47 @@ class _ChatBodyState extends State<_ChatBody> {
           constraints: const BoxConstraints(maxWidth: 820),
           child: Column(
             children: [
+              if (widget.pet case final pet?)
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 10, 20, 0),
+                  child: Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: PawmartColors.greenPale,
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Row(
+                      children: [
+                        SizedBox.square(
+                          dimension: 50,
+                          child: PetPortraitArtwork(petType: pet.petType),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Đang hỏi về ${pet.petName}',
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.w800,
+                                  color: PawmartColors.greenDark,
+                                ),
+                              ),
+                              const Text(
+                                'Hội thoại riêng cho hồ sơ này',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: PawmartColors.muted,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
               Expanded(
                 child: ListView(
                   controller: _scroll,
@@ -253,7 +333,9 @@ class _ChatBodyState extends State<_ChatBody> {
                               focusNode: _focus,
                               minLines: 1,
                               maxLines: 5,
-                              maxLength: 2000,
+                              maxLength: ChatAiViewModel.messageLimit(
+                                petName: widget.pet?.petName,
+                              ),
                               textCapitalization: TextCapitalization.sentences,
                               textInputAction: TextInputAction.newline,
                               decoration: const InputDecoration(

@@ -231,6 +231,12 @@ void main() {
     expect(queries.last, containsPair('pageSize', '12'));
     expect(find.widgetWithText(FilledButton, '2'), findsOneWidget);
     expect(find.text('Trang 2/2'), findsNothing);
+    await tester.tap(find.byTooltip('Trang trước'));
+    await tester.pumpAndSettle();
+    expect(queries.last, containsPair('page', '1'));
+    await tester.tap(find.byTooltip('Trang sau'));
+    await tester.pumpAndSettle();
+    expect(queries.last, containsPair('page', '2'));
   });
 
   testWidgets('Apply all filters once, then remove a selected criterion', (

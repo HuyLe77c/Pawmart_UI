@@ -497,36 +497,53 @@ class _CatalogPagination extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.fromLTRB(0, 4, 0, 28),
-    child: Center(
-      child: SingleChildScrollView(
-        scrollDirection: Axis.horizontal,
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            for (var page = 1; page <= totalPages; page++) ...[
-              if (page > 1) const SizedBox(width: 8),
-              SizedBox(
-                width: 44,
-                height: 44,
-                child: page == currentPage
-                    ? FilledButton(
-                        onPressed: () {},
-                        style: FilledButton.styleFrom(padding: EdgeInsets.zero),
-                        child: Text('$page'),
-                      )
-                    : OutlinedButton(
-                        onPressed: () => onPageSelected(page),
-                        style: OutlinedButton.styleFrom(
-                          padding: EdgeInsets.zero,
-                        ),
-                        child: Text('$page'),
-                      ),
-              ),
-            ],
-          ],
+    padding: const EdgeInsets.fromLTRB(20, 4, 20, 28),
+    child: Wrap(
+      alignment: WrapAlignment.center,
+      crossAxisAlignment: WrapCrossAlignment.center,
+      spacing: 8,
+      runSpacing: 8,
+      children: [
+        IconButton.outlined(
+          tooltip: 'Trang trước',
+          onPressed: currentPage > 1
+              ? () => onPageSelected(currentPage - 1)
+              : null,
+          icon: const Icon(Icons.chevron_left_rounded),
         ),
-      ),
+        for (final page in {
+          1,
+          if (currentPage > 2) currentPage - 1,
+          currentPage,
+          if (currentPage < totalPages - 1) currentPage + 1,
+          totalPages,
+        }.toList()..sort())
+          if (page == currentPage)
+            FilledButton(
+              onPressed: () {},
+              style: FilledButton.styleFrom(
+                minimumSize: const Size(46, 46),
+                padding: const EdgeInsets.symmetric(horizontal: 10),
+              ),
+              child: Text('$page', semanticsLabel: 'Trang $page, đang xem'),
+            )
+          else
+            OutlinedButton(
+              onPressed: () => onPageSelected(page),
+              style: OutlinedButton.styleFrom(
+                minimumSize: const Size(46, 46),
+                padding: const EdgeInsets.symmetric(horizontal: 10),
+              ),
+              child: Text('$page', semanticsLabel: 'Trang $page'),
+            ),
+        IconButton.outlined(
+          tooltip: 'Trang sau',
+          onPressed: currentPage < totalPages
+              ? () => onPageSelected(currentPage + 1)
+              : null,
+          icon: const Icon(Icons.chevron_right_rounded),
+        ),
+      ],
     ),
   );
 }

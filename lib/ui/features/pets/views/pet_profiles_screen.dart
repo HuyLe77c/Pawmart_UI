@@ -180,6 +180,8 @@ class _PetProfilesContent extends StatelessWidget {
                           pet: pet,
                           onEdit: () => _openForm(context, pet: pet),
                           onDelete: () => _delete(context, pet),
+                          onAsk: () =>
+                              context.push('/customer/chat-ai', extra: pet),
                           onAssistant: () => context.go(
                             '/customer/assistant?petId=${pet.petId}',
                           ),
@@ -390,11 +392,13 @@ class PetProfileCard extends StatelessWidget {
     required this.onEdit,
     required this.onDelete,
     required this.onAssistant,
+    this.onAsk,
   });
   final PetProfile pet;
   final VoidCallback onEdit;
   final VoidCallback onDelete;
   final VoidCallback onAssistant;
+  final VoidCallback? onAsk;
 
   @override
   Widget build(BuildContext context) {
@@ -697,6 +701,17 @@ class PetProfileCard extends StatelessWidget {
                     ),
                   ),
                 ],
+                if (onAsk != null) ...[
+                  const SizedBox(height: 18),
+                  SizedBox(
+                    width: double.infinity,
+                    child: FilledButton.icon(
+                      onPressed: onAsk,
+                      icon: const Icon(Icons.auto_awesome_outlined, size: 19),
+                      label: const Text('Hỏi AI về bé này'),
+                    ),
+                  ),
+                ],
                 const SizedBox(height: 20),
                 Row(
                   children: [
@@ -708,7 +723,7 @@ class PetProfileCard extends StatelessWidget {
                     ),
                     const SizedBox(width: 10),
                     Expanded(
-                      child: FilledButton(
+                      child: OutlinedButton(
                         onPressed: onAssistant,
                         child: const Text('Tư vấn'),
                       ),
