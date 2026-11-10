@@ -72,19 +72,25 @@ class CatalogViewModel extends ChangeNotifier {
         categories = fetchedCategories;
         _loadedCategories = true;
       }
-      final result = await _repository.search(
-        search: search,
-        categoryId: categoryId,
-        petType: petType,
-        breed: breed,
-        brand: brand,
-        minPrice: minPrice,
-        maxPrice: maxPrice,
-        inStockOnly: inStockOnly,
-        sort: sort,
-        page: currentPage,
-        pageSize: pageSize,
-      );
+      var result = await _searchPage(currentPage);
+      if (revision != _requestRevision) return;
+      // Stock/catalog changes may remove the page the customer was viewing.
+      final lastPage = result.totalItems == 0
+          ? 1
+          : (result.totalItems + pageSize - 1) ~/ pageSize;
+      if (result.page > lastPage) {
+        currentPage = lastPage;
+        if (result.totalItems == 0) {
+          result = PagedResult<Product>(
+            items: const [],
+            page: 1,
+            pageSize: pageSize,
+            totalItems: 0,
+          );
+        } else {
+          result = await _searchPage(lastPage);
+        }
+      }
       if (revision == _requestRevision) _applyFirstPage(result);
     } on ApiException catch (error) {
       if (revision == _requestRevision) errorMessage = error.userMessage;
@@ -99,6 +105,20 @@ class CatalogViewModel extends ChangeNotifier {
       }
     }
   }
+
+  Future<PagedResult<Product>> _searchPage(int page) => _repository.search(
+    search: search,
+    categoryId: categoryId,
+    petType: petType,
+    breed: breed,
+    brand: brand,
+    minPrice: minPrice,
+    maxPrice: maxPrice,
+    inStockOnly: inStockOnly,
+    sort: sort,
+    page: page,
+    pageSize: pageSize,
+  );
 
   Future<void> goToPage(int page) async {
     if (isLoading || page == currentPage || page < 1 || page > totalPages) {
